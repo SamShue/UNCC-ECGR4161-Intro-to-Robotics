@@ -1,0 +1,198 @@
+<h2>Introduction</h2>
+<p>In this lab you will learn how an H-bridge circuit controls the direction and braking behavior of a DC motor. You will write Python code that maps high-level motor commands (<code>"forward"</code>, <code>"reverse"</code>, <code>"stop"</code>, <code>"brake"</code>) to the correct combination of four transistor switch states, then verify your logic against an animated circuit simulation.</p>
+<p>Understanding H-bridge control is fundamental to robotics: virtually every mobile platform that uses DC motors relies on this circuit topology to achieve bidirectional motion.</p>
+
+<h2>Required Materials</h2>
+<ul>
+    <li>Python 3.8 or newer</li>
+    <li>Jupyter Notebook or JupyterLab (VS Code with the Jupyter extension is also supported)</li>
+    <li>The following Python packages: <code>matplotlib</code>, <code>ipywidgets</code> (install via <code>pip install -r requirements.txt</code>)</li>
+    <li>Lab notebook file: <code>h_bridge_motor_driver_assignment.ipynb</code> (provided in the course repository)</li>
+</ul>
+
+<h2>Software Installation</h2>
+<p><strong>If this is your first time using Python, follow every step below carefully before attempting to open the notebook. These steps only need to be completed once — you can skip this section in future labs once your computer is set up.</strong></p>
+
+<h3>Step A: Install Python on Windows</h3>
+<p>Python is the programming language used in this course. Nothing else will work until Python is installed correctly.</p>
+<ol>
+    <li>Open a web browser (Chrome, Edge, Firefox — any will work) and go to:<br><strong>https://www.python.org/downloads/</strong></li>
+    <li>Click the large yellow button that says <strong>"Download Python 3.x.x"</strong>. The exact version number does not matter as long as it starts with a 3.</li>
+    <li>When the download finishes, open your <strong>Downloads</strong> folder and double-click the file you just downloaded. It will be named something like <code>python-3.12.0-amd64.exe</code>.</li>
+    <li><strong style="color:red;">CRITICAL — do this before clicking anything else:</strong> At the very bottom of the first installer window, you will see a small checkbox labeled <strong>"Add Python to PATH"</strong>. <strong>Check this box.</strong> If you skip this step, Python will install but nothing will work, and you will need to uninstall and reinstall it from scratch.</li>
+    <li>Click <strong>"Install Now"</strong> (the top option). A progress bar will appear. Wait for it to finish — this usually takes about one minute.</li>
+    <li>When you see "Setup was successful", click <strong>Close</strong>.</li>
+    <li>Verify that Python installed correctly:
+        <ol type="a">
+            <li>Press the <strong>Windows key</strong> (the key with the Windows logo, usually between Ctrl and Alt on the bottom-left of your keyboard).</li>
+            <li>Type <code>cmd</code> and press <strong>Enter</strong>. A black window called the <em>Command Prompt</em> will open.</li>
+            <li>Type the following and press <strong>Enter</strong>:
+                <pre>python --version</pre>
+            </li>
+            <li>You should see a response like <code>Python 3.12.0</code>. If you see an error message like <em>"python is not recognized"</em>, the PATH checkbox was missed. Uninstall Python through <strong>Windows Settings → Apps</strong>, then return to step 1 and repeat, making sure to check the box in step 4.</li>
+        </ol>
+    </li>
+</ol>
+
+<h3>Step B: Install Visual Studio Code (VS Code)</h3>
+<p>VS Code is the program you will use to open and run the lab notebooks. Think of it like Microsoft Word, but for writing and running code.</p>
+<ol>
+    <li>Open a web browser and go to:<br><strong>https://code.visualstudio.com/</strong></li>
+    <li>Click the large blue <strong>"Download for Windows"</strong> button. The download will start automatically.</li>
+    <li>Open your Downloads folder and double-click the installer file (named something like <code>VSCodeUserSetup-x64-1.90.0.exe</code>).</li>
+    <li>Click <strong>"I accept the agreement"</strong> and then click <strong>Next</strong> on each screen until you reach a screen titled <strong>"Select Additional Tasks"</strong>.</li>
+    <li>On the "Select Additional Tasks" screen, check the box next to <strong>"Add to PATH (requires shell restart)"</strong> if it is not already checked. Leave all other checkboxes as they are.</li>
+    <li>Click <strong>Next</strong>, then click <strong>Install</strong>. Wait about one minute for it to finish.</li>
+    <li>Click <strong>Finish</strong>. VS Code will open automatically.</li>
+</ol>
+
+<h3>Step C: Install the Python and Jupyter Extensions in VS Code</h3>
+<p>VS Code starts as a basic text editor. You need to add two <em>extensions</em> (free plug-ins) to make it understand Python and notebook files.</p>
+<ol>
+    <li>With VS Code open, look at the far-left side of the window. You will see a vertical column of icons. Click the icon that looks like <strong>four small squares</strong> (it may have a number badge on it). This opens the <strong>Extensions</strong> panel on the left side of the screen.</li>
+    <li>You will see a search box at the top of the Extensions panel that says <em>"Search Extensions in Marketplace"</em>. Click in that box and type <code>Python</code>.</li>
+    <li>The first result in the list should be an extension called <strong>"Python"</strong> with the publisher listed as <strong>Microsoft</strong>. Click the blue <strong>Install</strong> button next to it. Wait for it to finish (the button will change to a gear icon when done).</li>
+    <li>Clear the search box and type <code>Jupyter</code>. The first result should be <strong>"Jupyter"</strong> published by <strong>Microsoft</strong>. Click <strong>Install</strong> and wait for it to finish.</li>
+    <li>You do not need to restart VS Code after installing extensions.</li>
+</ol>
+
+<h3>Step D: Download the Lab Notebook File</h3>
+<p>The notebook file for this lab is attached to this Canvas assignment. Download it using the link below:</p>
+<p><strong>[ INSERT DOWNLOAD LINK HERE ]</strong></p>
+<ol>
+    <li>Click the download link above. Your browser will download a file named <code>h_bridge_motor_driver_assignment.ipynb</code>.</li>
+    <li>Open your <strong>Downloads</strong> folder (press the <strong>Windows key</strong>, type <code>Downloads</code>, and press <strong>Enter</strong>).</li>
+    <li>Find the downloaded file and move it to a permanent location, such as your <strong>Documents</strong> folder. To do this, right-click the file, select <strong>Cut</strong>, navigate to Documents, right-click an empty area, and select <strong>Paste</strong>. Do not leave it in Downloads — files there can be deleted automatically.</li>
+</ol>
+
+<h3>Step E: Open the Notebook File in VS Code</h3>
+<ol>
+    <li>Switch back to VS Code.</li>
+    <li>In the menu bar at the very top of the screen, click <strong>File</strong>, then click <strong>Open File…</strong></li>
+    <li>In the file browser that opens, navigate to your <strong>Documents</strong> folder, click on <code>h_bridge_motor_driver_assignment.ipynb</code> once to select it, and click <strong>Open</strong>.</li>
+    <li>The notebook will open in the main editor area. VS Code may show a popup asking <em>"Do you trust the authors of the files in this folder?"</em> — click <strong>"Yes, I trust the authors"</strong>.</li>
+    <li>If VS Code asks you to <strong>"Select a kernel"</strong> or shows a banner about choosing a Python interpreter at the top of the notebook, click it and select the Python version you installed (e.g., <code>Python 3.12.0</code>). If no Python version appears in the list, make sure you completed Step A correctly.</li>
+</ol>
+
+<h3>Step F: Install the Required Python Packages</h3>
+<p>The lab notebook uses extra Python libraries that must be installed before running it. You only need to do this once across all labs.</p>
+<ol>
+    <li>In VS Code, open the integrated terminal by clicking <strong>Terminal</strong> in the menu bar at the top, then clicking <strong>New Terminal</strong>. A panel will appear at the bottom of the VS Code window with a prompt that looks like <code>PS C:\Users\YourName&gt;</code>.</li>
+    <li>Click inside that terminal panel so it is active, then type the following command exactly as written and press <strong>Enter</strong>:
+        <pre>pip install matplotlib ipywidgets</pre>
+    </li>
+    <li>Text will scroll by as Python downloads and installs the packages. This may take 1–3 minutes depending on your internet connection. Wait until the prompt (the line ending in <code>&gt;</code>) reappears before doing anything else.</li>
+    <li>You should see a line containing <strong>"Successfully installed"</strong> followed by package names. This means everything is ready.</li>
+    <li><strong>Troubleshooting:</strong> If you see a red error saying <em>"pip is not recognized"</em> or <em>"pip is not a cmdlet"</em>, Python was not added to PATH. Go back to Step A and reinstall Python, making sure to check the "Add Python to PATH" checkbox.</li>
+</ol>
+
+<h2>Background</h2>
+<p>An H-bridge uses four switches — Q1, Q2, Q3, and Q4 — arranged so that the motor sits between two switch legs. By closing different pairs of switches you route current through the motor in either direction, or you short both motor terminals to ground to brake it.</p>
+<pre>
++VCC
+ |         |
+[Q1]     [Q2]
+ |         |
+ +----M----+
+ |         |
+[Q3]     [Q4]
+ |         |
+GND
+</pre>
+<p>The four operating modes and their required switch states are:</p>
+<table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+        <tr><th>Command</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><code>"forward"</code></td><td>ON</td><td>OFF</td><td>OFF</td><td>ON</td><td>Current flows A → B (motor spins forward)</td></tr>
+        <tr><td><code>"reverse"</code></td><td>OFF</td><td>ON</td><td>ON</td><td>OFF</td><td>Current flows B → A (motor spins in reverse)</td></tr>
+        <tr><td><code>"stop"</code></td><td>OFF</td><td>OFF</td><td>OFF</td><td>OFF</td><td>Motor terminals floating — coasts to a stop</td></tr>
+        <tr><td><code>"brake"</code></td><td>OFF</td><td>OFF</td><td>ON</td><td>ON</td><td>Both terminals tied to GND — motor brakes</td></tr>
+    </tbody>
+</table>
+<p><strong>⚠ Never turn on Q1 and Q3 (or Q2 and Q4) simultaneously.</strong> This creates a shoot-through condition — a direct short from VCC to GND that can permanently damage the circuit.</p>
+
+<h2>Procedure</h2>
+
+<h3>Step 1: Open the Notebook File</h3>
+<p>If you have not yet installed Python, VS Code, and the required packages, complete the <strong>Software Installation</strong> section above first before continuing.</p>
+<p>Open the file <code>h_bridge_motor_driver_assignment.ipynb</code> that you downloaded and moved to your Documents folder in Step D. In VS Code, click <strong>File → Open File…</strong>, navigate to your Documents folder, and double-click the file. If VS Code prompts you to select a Python interpreter or kernel, choose the Python 3 version you installed.</p>
+
+<h3>Step 2: Run the Setup Cell</h3>
+<p>Run the first code cell (the Setup cell). This imports <code>matplotlib</code>, <code>ipywidgets</code>, and the other libraries needed by the visualization engine. You should see no errors. If <code>ipywidgets</code> is missing you will see a warning — install it with <code>pip install ipywidgets</code> and re-run the cell.</p>
+
+<h3>Step 3: Read the Signal Reference</h3>
+<p>Read the "H-Bridge Signal Names" section carefully. It defines what Q1–Q4 represent and clarifies that a value of <code>1</code> means the switch is ON and <code>0</code> means OFF.</p>
+
+<h3>Step 4: Implement <code>set_hbridge()</code></h3>
+<p>Find the student implementation cell and complete the <code>set_hbridge(motion)</code> function. For each value of <code>motion</code>, call the four setter functions with the correct 0/1 values.</p>
+<p>The Python structure you need is an <code>if / elif / else</code> chain. Here is the syntax pattern to follow — you must fill in the correct <code>0</code> or <code>1</code> argument for each setter:</p>
+<pre>
+def set_hbridge(motion):
+    if motion == "forward":
+        setQ1(???)   # High-side left  — should this be ON or OFF?
+        setQ2(???)   # High-side right — should this be ON or OFF?
+        setQ3(???)   # Low-side  left  — should this be ON or OFF?
+        setQ4(???)   # Low-side  right — should this be ON or OFF?
+    elif motion == "reverse":
+        setQ1(???)
+        setQ2(???)
+        setQ3(???)
+        setQ4(???)
+    elif motion == "stop":
+        setQ1(???)
+        setQ2(???)
+        setQ3(???)
+        setQ4(???)
+    elif motion == "brake":
+        setQ1(???)
+        setQ2(???)
+        setQ3(???)
+        setQ4(???)
+    else:
+        raise ValueError("motion must be one of: forward, reverse, stop, brake")
+</pre>
+<p>Refer to the truth table in the Background section above to determine the correct switch states for each command.</p>
+
+<h3>Step 5: Run the Visualization Engine Cell</h3>
+<p>Run the "Visualization Engine" cell. You do not need to modify any code in this cell — it defines the animation and drawing functions used in the next step.</p>
+
+<h3>Step 6: Animate Your Solution</h3>
+<p>Run the "Try Your Function" cell. The simulation will cycle through <code>["forward", "reverse", "brake", "stop"]</code>, showing the H-bridge schematic with highlighted current paths and an animated rotor for each command. Verify visually that:</p>
+<ul>
+    <li><strong>Forward</strong> — the left high-side and right low-side wires are highlighted in gold; the rotor spins clockwise.</li>
+    <li><strong>Reverse</strong> — the right high-side and left low-side wires are highlighted; the rotor spins counter-clockwise.</li>
+    <li><strong>Brake</strong> — both low-side wires and the motor wires are highlighted; the rotor stops.</li>
+    <li><strong>Stop</strong> — no wires are highlighted; the circuit is open.</li>
+</ul>
+<p>If you see a red "⚡ SHOOT-THROUGH" warning, your switch states for that command are incorrect — revisit the truth table.</p>
+
+<h3>Step 7: Run the Self-Checks</h3>
+<p>Run the "Self-Checks" cell. You should see five <strong>PASS</strong> lines — one for each of the four commands and one confirming that an invalid command raises a <code>ValueError</code>:</p>
+<pre>
+PASS: forward
+PASS: reverse
+PASS: stop
+PASS: brake
+PASS: invalid command raises ValueError
+</pre>
+<p>If any test shows <strong>FAIL</strong>, compare the expected switch states printed in the output against your implementation and correct the error.</p>
+
+<h2>How to Submit</h2>
+<p>Once all self-checks pass and the animation looks correct, copy your completed <code>set_hbridge()</code> function and paste it directly into the <strong>text entry box</strong> on this Canvas assignment page. Your submission should contain only the function definition — no imports, no extra code.</p>
+<p>Example of what your submission should look like:</p>
+<pre>
+def set_hbridge(motion):
+    if motion == "forward":
+        setQ1(1); setQ2(0); setQ3(0); setQ4(1)
+    elif motion == "reverse":
+        setQ1(0); setQ2(1); setQ3(1); setQ4(0)
+    elif motion == "stop":
+        setQ1(0); setQ2(0); setQ3(0); setQ4(0)
+    elif motion == "brake":
+        setQ1(0); setQ2(0); setQ3(1); setQ4(1)
+    else:
+        raise ValueError("motion must be one of: forward, reverse, stop, brake")
+</pre>
+<p>Submissions that do not pass all five self-checks will not receive full credit. You will have two attempts to submit before the deadline.</p>

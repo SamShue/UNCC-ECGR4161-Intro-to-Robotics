@@ -1,0 +1,213 @@
+<h2>Introduction</h2>
+<p>In this lab you will implement the <strong>inverse kinematics</strong> of a bicycle-model robot. Given a desired linear velocity and angular velocity, you will compute the wheel speed and steering angle that the robot's motors must produce to achieve that motion — then verify your result against an animated trajectory simulation.</p>
+<p>The bicycle model is one of the most widely used kinematic models in mobile robotics and autonomous vehicles. Mastering its inverse kinematics is a prerequisite for path-following, waypoint navigation, and model-predictive control.</p>
+
+<h2>Required Materials</h2>
+<ul>
+    <li>Python 3.8 or newer</li>
+    <li>Jupyter Notebook or JupyterLab (VS Code with the Jupyter extension is also supported)</li>
+    <li>The following Python packages: <code>matplotlib</code>, <code>numpy</code>, <code>ipywidgets</code> (install via <code>pip install -r requirements.txt</code>)</li>
+    <li>Lab notebook file: <code>bicycle_model_ik_assignment.ipynb</code> (provided in the course repository under <code>lab2_bicycle_model_ik/</code>)</li>
+</ul>
+
+<h2>Software Installation</h2>
+<p><strong>If this is your first time using Python, follow every step below carefully before attempting to open the notebook. These steps only need to be completed once — you can skip this section in future labs once your computer is set up.</strong></p>
+
+<h3>Step A: Install Python on Windows</h3>
+<p>Python is the programming language used in this course. Nothing else will work until Python is installed correctly.</p>
+<ol>
+    <li>Open a web browser (Chrome, Edge, Firefox — any will work) and go to:<br><strong>https://www.python.org/downloads/</strong></li>
+    <li>Click the large yellow button that says <strong>"Download Python 3.x.x"</strong>. The exact version number does not matter as long as it starts with a 3.</li>
+    <li>When the download finishes, open your <strong>Downloads</strong> folder and double-click the file you just downloaded. It will be named something like <code>python-3.12.0-amd64.exe</code>.</li>
+    <li><strong style="color:red;">CRITICAL — do this before clicking anything else:</strong> At the very bottom of the first installer window, you will see a small checkbox labeled <strong>"Add Python to PATH"</strong>. <strong>Check this box.</strong> If you skip this step, Python will install but nothing will work, and you will need to uninstall and reinstall it from scratch.</li>
+    <li>Click <strong>"Install Now"</strong> (the top option). A progress bar will appear. Wait for it to finish — this usually takes about one minute.</li>
+    <li>When you see "Setup was successful", click <strong>Close</strong>.</li>
+    <li>Verify that Python installed correctly:
+        <ol type="a">
+            <li>Press the <strong>Windows key</strong> (the key with the Windows logo, usually between Ctrl and Alt on the bottom-left of your keyboard).</li>
+            <li>Type <code>cmd</code> and press <strong>Enter</strong>. A black window called the <em>Command Prompt</em> will open.</li>
+            <li>Type the following and press <strong>Enter</strong>:
+                <pre>python --version</pre>
+            </li>
+            <li>You should see a response like <code>Python 3.12.0</code>. If you see an error message like <em>"python is not recognized"</em>, the PATH checkbox was missed. Uninstall Python through <strong>Windows Settings → Apps</strong>, then return to step 1 and repeat, making sure to check the box in step 4.</li>
+        </ol>
+    </li>
+</ol>
+
+<h3>Step B: Install Visual Studio Code (VS Code)</h3>
+<p>VS Code is the program you will use to open and run the lab notebooks. Think of it like Microsoft Word, but for writing and running code.</p>
+<ol>
+    <li>Open a web browser and go to:<br><strong>https://code.visualstudio.com/</strong></li>
+    <li>Click the large blue <strong>"Download for Windows"</strong> button. The download will start automatically.</li>
+    <li>Open your Downloads folder and double-click the installer file (named something like <code>VSCodeUserSetup-x64-1.90.0.exe</code>).</li>
+    <li>Click <strong>"I accept the agreement"</strong> and then click <strong>Next</strong> on each screen until you reach a screen titled <strong>"Select Additional Tasks"</strong>.</li>
+    <li>On the "Select Additional Tasks" screen, check the box next to <strong>"Add to PATH (requires shell restart)"</strong> if it is not already checked. Leave all other checkboxes as they are.</li>
+    <li>Click <strong>Next</strong>, then click <strong>Install</strong>. Wait about one minute for it to finish.</li>
+    <li>Click <strong>Finish</strong>. VS Code will open automatically.</li>
+</ol>
+
+<h3>Step C: Install the Python and Jupyter Extensions in VS Code</h3>
+<p>VS Code starts as a basic text editor. You need to add two <em>extensions</em> (free plug-ins) to make it understand Python and notebook files.</p>
+<ol>
+    <li>With VS Code open, look at the far-left side of the window. You will see a vertical column of icons. Click the icon that looks like <strong>four small squares</strong> (it may have a number badge on it). This opens the <strong>Extensions</strong> panel on the left side of the screen.</li>
+    <li>You will see a search box at the top of the Extensions panel that says <em>"Search Extensions in Marketplace"</em>. Click in that box and type <code>Python</code>.</li>
+    <li>The first result in the list should be an extension called <strong>"Python"</strong> with the publisher listed as <strong>Microsoft</strong>. Click the blue <strong>Install</strong> button next to it. Wait for it to finish (the button will change to a gear icon when done).</li>
+    <li>Clear the search box and type <code>Jupyter</code>. The first result should be <strong>"Jupyter"</strong> published by <strong>Microsoft</strong>. Click <strong>Install</strong> and wait for it to finish.</li>
+    <li>You do not need to restart VS Code after installing extensions.</li>
+</ol>
+
+<h3>Step D: Download the Lab Notebook File</h3>
+<p>The notebook file for this lab is attached to this Canvas assignment. Download it using the link below:</p>
+<p><strong>[ INSERT DOWNLOAD LINK HERE ]</strong></p>
+<ol>
+    <li>Click the download link above. Your browser will download a file named <code>bicycle_model_ik_assignment.ipynb</code>.</li>
+    <li>Open your <strong>Downloads</strong> folder (press the <strong>Windows key</strong>, type <code>Downloads</code>, and press <strong>Enter</strong>).</li>
+    <li>Find the downloaded file and move it to a permanent location, such as your <strong>Documents</strong> folder. To do this, right-click the file, select <strong>Cut</strong>, navigate to Documents, right-click an empty area, and select <strong>Paste</strong>. Do not leave it in Downloads — files there can be deleted automatically.</li>
+</ol>
+
+<h3>Step E: Open the Notebook File in VS Code</h3>
+<ol>
+    <li>Switch back to VS Code.</li>
+    <li>In the menu bar at the very top of the screen, click <strong>File</strong>, then click <strong>Open File…</strong></li>
+    <li>In the file browser that opens, navigate to your <strong>Documents</strong> folder, click on <code>bicycle_model_ik_assignment.ipynb</code> once to select it, and click <strong>Open</strong>.</li>
+    <li>The notebook will open in the main editor area. VS Code may show a popup asking <em>"Do you trust the authors of the files in this folder?"</em> — click <strong>"Yes, I trust the authors"</strong>.</li>
+    <li>If VS Code asks you to <strong>"Select a kernel"</strong> or shows a banner about choosing a Python interpreter at the top of the notebook, click it and select the Python version you installed (e.g., <code>Python 3.12.0</code>). If no Python version appears in the list, make sure you completed Step A correctly.</li>
+</ol>
+
+<h3>Step F: Install the Required Python Packages</h3>
+<p>The lab notebook uses extra Python libraries that must be installed before running it. You only need to do this once across all labs.</p>
+<ol>
+    <li>In VS Code, open the integrated terminal by clicking <strong>Terminal</strong> in the menu bar at the top, then clicking <strong>New Terminal</strong>. A panel will appear at the bottom of the VS Code window with a prompt that looks like <code>PS C:\Users\YourName&gt;</code>.</li>
+    <li>Click inside that terminal panel so it is active, then type the following command exactly as written and press <strong>Enter</strong>:
+        <pre>pip install matplotlib numpy ipywidgets</pre>
+    </li>
+    <li>Text will scroll by as Python downloads and installs the packages. This may take 1–3 minutes depending on your internet connection. Wait until the prompt (the line ending in <code>&gt;</code>) reappears before doing anything else.</li>
+    <li>You should see a line containing <strong>"Successfully installed"</strong> followed by package names. This means everything is ready.</li>
+    <li><strong>Troubleshooting:</strong> If you see a red error saying <em>"pip is not recognized"</em> or <em>"pip is not a cmdlet"</em>, Python was not added to PATH. Go back to Step A and reinstall Python, making sure to check the "Add Python to PATH" checkbox.</li>
+</ol>
+
+<h2>Background</h2>
+<p>The bicycle model simplifies a four-wheeled vehicle into two axles: a fixed rear drive axle and a steerable front axle. The distance between the axles is called the <strong>wheelbase</strong>, denoted <strong>L</strong>.</p>
+<pre>
+      δ (steering angle)
+     /
+[front wheel]
+     |
+     |  L  (wheelbase)
+     |
+[rear wheel] ──▶ heading θ
+</pre>
+<p>The robot accepts two <strong>high-level command inputs</strong>:</p>
+<ul>
+    <li><strong>v_cmd</strong> — desired linear velocity (m/s): how fast the robot should move forward</li>
+    <li><strong>ω_cmd</strong> — desired angular velocity (rad/s): how fast the robot's heading should rotate</li>
+</ul>
+<p>Your task is to translate these into two <strong>low-level motor outputs</strong>:</p>
+<ul>
+    <li><strong>speed</strong> — rear drive wheel speed (m/s), set via <code>setWheelSpeed(speed)</code></li>
+    <li><strong>δ</strong> — front steering angle (radians), set via <code>setSteeringAngle(delta)</code></li>
+</ul>
+<p>The relationship comes from the no-slip kinematic constraint. The robot's heading rate is:</p>
+<p style="text-align: center;"><em>ω = (speed / L) × tan(δ)</em></p>
+<p>Rearranging to solve for the steering angle (the <strong>inverse kinematics</strong> formula):</p>
+<p style="text-align: center;"><strong>δ = arctan( ω_cmd × L / v_cmd )</strong></p>
+<p>The simulated robot in this lab has a wheelbase of <strong>ROBOT_WHEELBASE = 1.0 m</strong>. This constant is defined in the simulation engine and must be used in your implementation — do not hardcode the number <code>1.0</code>.</p>
+<table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+        <tr><th>v_cmd (m/s)</th><th>ω_cmd (rad/s)</th><th>Expected speed</th><th>Expected δ (rad)</th><th>Motion</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>1.0</td><td>0.0</td><td>1.0 m/s</td><td>0.0</td><td>Straight line</td></tr>
+        <tr><td>1.0</td><td>1.0</td><td>1.0 m/s</td><td>≈ 0.785 (45°)</td><td>Left arc</td></tr>
+        <tr><td>2.0</td><td>1.0</td><td>2.0 m/s</td><td>≈ 0.464 (26.6°)</td><td>Faster, larger arc</td></tr>
+        <tr><td>1.0</td><td>−1.0</td><td>1.0 m/s</td><td>≈ −0.785 (−45°)</td><td>Right arc</td></tr>
+        <tr><td>0.0</td><td>any</td><td>0.0 m/s</td><td>0.0</td><td>Stationary</td></tr>
+    </tbody>
+</table>
+
+<h2>Procedure</h2>
+
+<h3>Step 1: Open the Notebook File</h3>
+<p>If you have not yet installed Python, VS Code, and the required packages, complete the <strong>Software Installation</strong> section above first before continuing.</p>
+<p>Open the file <code>bicycle_model_ik_assignment.ipynb</code> that you downloaded and moved to your Documents folder in Step D. In VS Code, click <strong>File → Open File…</strong>, navigate to your Documents folder, and double-click the file. If VS Code prompts you to select a Python interpreter or kernel, choose the Python 3 version you installed.</p>
+
+<h3>Step 2: Run the Setup Cell</h3>
+<p>Run the first code cell (the Setup cell). It imports <code>math</code>, <code>numpy</code>, <code>matplotlib</code>, and other dependencies. You should see no errors.</p>
+
+<h3>Step 3: Read the Parameters Section</h3>
+<p>Read the "Bicycle Model Parameters" section carefully. Pay attention to:</p>
+<ul>
+    <li>The definition of <code>ROBOT_WHEELBASE</code> and why it matters</li>
+    <li>The difference between command inputs (what you receive) and motor outputs (what you must set)</li>
+    <li>The edge case when <code>v_cmd == 0</code></li>
+</ul>
+
+<h3>Step 4: Implement <code>apply_command()</code></h3>
+<p>Find the student implementation cell and complete the <code>apply_command(v_cmd, omega_cmd)</code> function. You must call <strong>both</strong> setter functions:</p>
+<pre>
+def apply_command(v_cmd, omega_cmd):
+    # Step 1 — Set the wheel speed.
+    # The rear wheel must travel at exactly the commanded linear velocity.
+    setWheelSpeed(???)
+
+    # Step 2 — Compute and set the steering angle.
+    # Handle the v_cmd == 0 edge case to avoid division by zero.
+    if v_cmd == 0:
+        setSteeringAngle(???)
+    else:
+        # Use the inverse kinematics formula:
+        #   delta = atan(omega_cmd * ROBOT_WHEELBASE / v_cmd)
+        # Use math.atan() and the ROBOT_WHEELBASE constant.
+        setSteeringAngle(???)
+</pre>
+<p>Replace each <code>???</code> with the correct expression. Use <code>math.atan()</code> for the arctangent — not <code>math.atan2()</code>.</p>
+
+<h3>Step 5: Run the Simulation Engine Cell</h3>
+<p>Run the "Simulation Engine" cell. This defines <code>ROBOT_WHEELBASE</code>, the setter functions, and the animation engine. You do not need to modify any code in this cell.</p>
+
+<h3>Step 6: Animate Your Solution</h3>
+<p>Run the "Try Your Function" cell. Your robot will animate in real time on a single plot. The <strong>dotted gray line</strong> shows the correct reference trajectory. Your robot's trail is drawn in <strong>blue</strong>. The HUD in the top-left corner shows the wheel speed and steering angle your function is producing at each frame.</p>
+<p>Try changing the parameters at the top of the cell to explore different maneuvers:</p>
+<table border="1" cellpadding="6" cellspacing="0">
+    <thead><tr><th>v_cmd</th><th>omega_cmd</th><th>Expected motion</th></tr></thead>
+    <tbody>
+        <tr><td>1.0</td><td>0.0</td><td>Straight line</td></tr>
+        <tr><td>1.0</td><td>0.5</td><td>Gentle left arc</td></tr>
+        <tr><td>1.0</td><td>1.0</td><td>Tighter left circle</td></tr>
+        <tr><td>1.0</td><td>−0.5</td><td>Gentle right arc</td></tr>
+    </tbody>
+</table>
+<p>When your animation finishes, the title will show a green <strong>✔ Matches reference</strong> if your path is correct, or a red <strong>✘ Differs from reference</strong> with the mean position error if it is not.</p>
+
+<h3>Step 7: Run the Self-Checks</h3>
+<p>Run the "Self-Checks" cell. Each test checks both your wheel speed and your steering angle output. You should see <strong>PASS</strong> for every line:</p>
+<pre>
+PASS: straight line (omega=0) — wheel speed
+PASS: straight line (omega=0) — steering angle
+PASS: left turn, v=1 ω=1 — wheel speed
+PASS: left turn, v=1 ω=1 — steering angle
+...
+PASS: stationary (v=0, ω≠0) — wheel speed
+PASS: stationary (v=0, ω≠0) — steering angle
+
+All tests passed! Great work.
+</pre>
+<p>If any test shows <strong>FAIL</strong>, check:</p>
+<ul>
+    <li>That you are calling <em>both</em> <code>setWheelSpeed()</code> and <code>setSteeringAngle()</code></li>
+    <li>That you are using <code>ROBOT_WHEELBASE</code> (not a hardcoded number) in the formula</li>
+    <li>That your <code>v_cmd == 0</code> edge case sets steering to <code>0.0</code></li>
+</ul>
+
+<h2>How to Submit</h2>
+<p>Once all self-checks pass and the animation matches the reference trajectory, copy your completed <code>apply_command()</code> function and paste it directly into the <strong>text entry box</strong> on this Canvas assignment page. Your submission should contain only the function definition — no imports, no extra code.</p>
+<p>Example of what your submission should look like:</p>
+<pre>
+def apply_command(v_cmd, omega_cmd):
+    setWheelSpeed(v_cmd)
+    if v_cmd == 0:
+        setSteeringAngle(0.0)
+    else:
+        setSteeringAngle(math.atan(omega_cmd * ROBOT_WHEELBASE / v_cmd))
+</pre>
+<p>Submissions that do not pass all self-checks will not receive full credit. You will have two attempts to submit before the deadline.</p>

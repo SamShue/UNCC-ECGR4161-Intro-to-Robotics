@@ -1,9 +1,11 @@
 # ECGR 4161 Intro to Robotics Notebooks
 
-This repository contains notebook assignments for motor control simulations:
+This repository contains notebook assignments for robotics simulations:
 
-- `h_bridge_motor_driver_assignment.ipynb`
-- `stepper_motor_full_step_assignment.ipynb`
+- `lab1_h_bridge_motor_driver/h_bridge_motor_driver_assignment.ipynb`
+- `lab2_bicycle_model_ik/bicycle_model_ik_assignment.ipynb`
+- `lab3_stepper_motor_full_step/stepper_motor_full_step_assignment.ipynb`
+- `lab4_kalman_filter_sensor_fusion/kalman_filter_sensor_fusion_assignment.ipynb`
 
 ## Environment Setup
 

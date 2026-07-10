@@ -1,0 +1,138 @@
+<h2>Introduction</h2>
+<p>In this lab you will study how a <strong>Kalman filter</strong> fuses three noisy sensors into a single, statistically-optimal estimate of a robot's motion. A robot drives along a <strong>circular path</strong> while three sensors report on its motion every time step: a wheel <strong>encoder</strong> measures linear velocity, an <strong>accelerometer</strong> measures tangential acceleration, and a <strong>gyroscope</strong> measures rotational (yaw) velocity.</p>
+<p>The Kalman filter code is <strong>already written for you</strong>. Your job is not to implement the filter — it is to <strong>experiment with the process-noise matrix <code>Q</code> and the measurement-noise matrix <code>R</code></strong> and observe how those two knobs control the balance between trusting the robot's motion model and trusting the noisy sensors.</p>
+<p>Sensor fusion with a Kalman filter is one of the most important techniques in mobile robotics, self-driving cars, drones, and inertial navigation. Understanding the roles of <code>Q</code> and <code>R</code> is the key to tuning any real estimator.</p>
+
+<h2>Required Materials</h2>
+<ul>
+    <li>Python 3.8 or newer</li>
+    <li>Jupyter Notebook or JupyterLab (VS Code with the Jupyter extension is also supported)</li>
+    <li>The following Python packages: <code>matplotlib</code>, <code>numpy</code>, <code>ipywidgets</code> (install via <code>pip install -r requirements.txt</code>)</li>
+    <li>Lab notebook file: <code>kalman_filter_sensor_fusion_assignment.ipynb</code> (provided in the course repository under <code>lab4_kalman_filter_sensor_fusion/</code>)</li>
+</ul>
+
+<h2>Software Installation</h2>
+<p><strong>If you have already completed the software setup in an earlier lab (Python, VS Code, the Python and Jupyter extensions, and the required packages), you can skip this section.</strong> If this is your first lab, follow every step in the "Software Installation" section of an earlier lab (for example the H-Bridge or Bicycle Model lab) to install Python, VS Code, the Python and Jupyter extensions, and then run the following in a VS Code terminal to install the packages used by this lab:</p>
+<pre>pip install matplotlib numpy ipywidgets</pre>
+
+<h2>Background</h2>
+
+<h3>The motion state</h3>
+<p>The Kalman filter maintains a belief about the robot's motion <strong>state</strong>, a vector of three quantities:</p>
+<pre>
+      | v |     linear velocity      (m/s)     -- measured by the encoder
+  x = | a |     linear acceleration  (m/s^2)   -- measured by the accelerometer
+      | w |     rotational velocity  (rad/s)   -- measured by the gyroscope
+</pre>
+
+<h3>The predict step (dynamics, no control input)</h3>
+<p>Every iteration the filter first <strong>predicts</strong> the next state using the robot's dynamics. There is <strong>no control input</strong> — the filter relies only on the physics model:</p>
+<pre>
+  v_next = v + a * dt      (velocity integrates acceleration)
+  a_next = a               (acceleration assumed steady)
+  w_next = w               (turn rate assumed steady)
+</pre>
+<p>In matrix form <em>x<sub>k+1</sub> = F x<sub>k</sub></em> with:</p>
+<pre>
+      | 1  dt  0 |
+  F = | 0   1  0 |
+      | 0   0  1 |
+</pre>
+<p>Because the real robot changes its acceleration and turn rate when it speeds up and slows down, the constant-<em>a</em> / constant-<em>w</em> assumption is imperfect. The <strong>process-noise matrix <code>Q</code></strong> tells the filter how much to distrust this model.</p>
+
+<h3>The update step (measurement)</h3>
+<p>Next the filter <strong>updates</strong> the prediction using the three sensor readings. Because each sensor observes a state variable directly, the measurement matrix <em>H</em> is the identity. The <strong>measurement-noise matrix <code>R</code></strong> encodes how noisy each sensor is.</p>
+
+<h3>The two knobs you will tune</h3>
+<table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+        <tr><th>Matrix</th><th>Meaning</th><th>Small value</th><th>Large value</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>R</code> (measurement noise)</td>
+            <td>How much to distrust the <em>sensors</em></td>
+            <td>Trust the sensors — estimate hugs the noisy readings</td>
+            <td>Distrust the sensors — estimate leans on the model, stays smooth but can lag</td>
+        </tr>
+        <tr>
+            <td><code>Q</code> (process noise)</td>
+            <td>How much to distrust the <em>model</em></td>
+            <td>Trust the model — smooth, slow to react to change</td>
+            <td>Distrust the model — reacts quickly to the sensors, but noisier</td>
+        </tr>
+    </tbody>
+</table>
+<p>A sensible starting point sets <code>R</code> to the true sensor variances (the squares of the sensor noise standard deviations defined in the notebook).</p>
+
+<h3>Reading the Gaussian belief plots</h3>
+<p>The dashboard draws, for each variable, three bell curves at the current step:</p>
+<ul>
+    <li><strong>Orange — prediction (prior):</strong> the belief after the predict step, before seeing the sensor.</li>
+    <li><strong>Green — measurement:</strong> the sensor reading and its noise.</li>
+    <li><strong>Blue — updated (posterior):</strong> the fused belief after the update step.</li>
+</ul>
+<p>The posterior is always <em>narrower</em> than both inputs — that sharpening is exactly what "fusion" means: combining two uncertain sources yields a more certain estimate.</p>
+
+<h2>Procedure</h2>
+
+<h3>Step 1: Open the Notebook File</h3>
+<p>Open <code>kalman_filter_sensor_fusion_assignment.ipynb</code> in VS Code (<strong>File → Open File…</strong>). If prompted, select your Python 3 interpreter or the <strong>Python (ecgr4161-venv)</strong> kernel.</p>
+
+<h3>Step 2: Run the Setup Cell</h3>
+<p>Run the first code cell (the Setup cell). It imports <code>numpy</code>, <code>matplotlib</code>, and the display helpers. You should see no errors.</p>
+
+<h3>Step 3: Generate the Truth and the Sensors</h3>
+<p>Run the "Generate the True Robot Trajectory" cell and then the "Add Sensor Noise" cell. These build the ground-truth circular motion profile and the noisy encoder, accelerometer, and gyroscope readings. You do not need to modify these cells.</p>
+
+<h3>Step 4: Read the Kalman Filter Cell</h3>
+<p>Run the "Kalman Filter (Provided)" cell. Read the <code>predict()</code> and <code>update()</code> methods so you understand where <code>Q</code> and <code>R</code> enter the math, but <strong>do not modify this code</strong>.</p>
+
+<h3>Step 5: Set <code>Q</code> and <code>R</code></h3>
+<p>Run the "Tune <code>Q</code> and <code>R</code>" cell as provided the first time. This is the <strong>only</strong> cell you will edit during the experiments.</p>
+
+<h3>Step 6: Run the Live Dashboard</h3>
+<p>Run the "Run the Live Fusion Dashboard" cell. The notebook steps the Kalman filter through the whole trajectory, <strong>pausing after every iteration</strong> to redraw:</p>
+<ul>
+    <li><strong>Top:</strong> the true circular path with a marker showing the robot's current position (shown for context — this lab fuses motion measurements, not position).</li>
+    <li><strong>Middle row:</strong> time-series for velocity, acceleration, and turn rate — truth (gray), noisy sensor (green dots), and the fused estimate (blue) with a ±1σ uncertainty band.</li>
+    <li><strong>Bottom row:</strong> the orange prediction, green measurement, and blue updated Gaussian for each variable at the current step.</li>
+</ul>
+<p>The cell prints the <strong>RMSE</strong> of the fused estimate against the truth so you can compare runs numerically. Lower the <code>PAUSE</code> value or raise <code>RENDER_EVERY</code> to speed up the animation.</p>
+
+<h3>Step 7: Run the Experiments</h3>
+<p>Change <code>Q</code> and/or <code>R</code> in the Step 4 cell (or use the scratchpad cell), re-run, and observe the effect. Complete each of the following experiments and note what happens to the time-series, the Gaussian plots, and the RMSE:</p>
+<table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+        <tr><th>#</th><th>Change</th><th>What to look for</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>1</td><td>Trust the sensors: shrink <code>R</code> by 100× (<code>R * 0.01</code>)</td><td>Estimate snaps onto the noisy dots; posterior bell nearly matches the measurement bell.</td></tr>
+        <tr><td>2</td><td>Distrust the sensors: grow <code>R</code> by 100× (<code>R * 100</code>)</td><td>Estimate becomes very smooth but lags during accel/decel.</td></tr>
+        <tr><td>3</td><td>Trust the model: shrink <code>Q</code> by 100×</td><td>Very smooth estimate, slow to react when acceleration jumps.</td></tr>
+        <tr><td>4</td><td>Distrust the model: grow <code>Q</code> by 100×</td><td>Estimate reacts fast but gets noisy.</td></tr>
+        <tr><td>5</td><td>Distrust only the accelerometer: make <code>R[1,1]</code> huge</td><td>The filter leans on the encoder and the model to reconstruct acceleration.</td></tr>
+    </tbody>
+</table>
+
+<h3>Step 8: Answer the Reflection Questions</h3>
+<p>Answer the reflection questions in the final section of the notebook in a few sentences each. There is no automated self-check for this lab — the goal is understanding, not a matching score.</p>
+
+<h2>How to Submit</h2>
+<p>Submit the following in the <strong>text entry box</strong> on this Canvas assignment page:</p>
+<ol>
+    <li>Your final <code>Q</code> and <code>R</code> matrices (the values that gave you the lowest RMSE), copied from your Step 4 cell.</li>
+    <li>The RMSE values printed for that best run (v, a, and w).</li>
+    <li>Your written answers to the five reflection questions.</li>
+</ol>
+<p>Example header for your submission:</p>
+<pre>
+Best Q = diag([0.01, 0.05, 0.005])
+Best R = diag([0.01, 0.0625, 0.0016])
+RMSE -> v: 0.076 m/s   a: 0.167 m/s^2   w: 0.031 rad/s
+
+Reflection answers:
+1. ...
+2. ...
+</pre>
+<p>You will have two attempts to submit before the deadline.</p>

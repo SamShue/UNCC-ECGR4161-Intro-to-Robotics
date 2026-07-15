@@ -1,0 +1,247 @@
+<div id="dp-wrapper" class="dp-wrapper">
+    <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
+        <h2><span style="color: #004b87;">Objective</span></h2>
+        <p>In this lab, we will bridge the gap between high-level logic and low-level hardware actuation. You will implement differential drive kinematics to translate standard ROS 2 movement commands into individual wheel speeds, and you will write a Proportional-Integral (PI) control loop to ensure the physical motors accurately track those desired speeds.</p>
+        <h2><span style="color: #004b87;">Required Materials</span></h2>
+        <ul>
+            <li>Romi32U4 Robot</li>
+            <li>Raspberry Pi 4B</li>
+            <li>&ge; 32GB MicroSD Card (Flashed with preconfigured image)</li>
+            <li>Laptop (Windows Preferred)</li>
+            <li>6x AA Batteries</li>
+        </ul>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">Background</span></h2>
+        <h3>Twist Commands</h3>
+        <p>In ROS 2, the standard way to tell a robot how to move is by publishing a <code style="font-family: monospace; color: #273540;">geometry_msgs/msg/Twist</code> message. A Twist message represents velocity in free space and contains two main components:</p>
+        <ul>
+            <li><strong>Linear Velocity:</strong> Movement along the axes (x, y, z) measured in m/s.</li>
+            <li><strong>Angular Velocity:</strong> Rotation around the axes (x, y, z) measured in rad/s.</li>
+        </ul>
+        <p>Because the Romi is a ground-based robot that cannot fly or strafe, we only care about two of these values: linear velocity moving forward/backward (<code style="font-family: monospace; color: #273540;">linear.x</code>) and angular velocity rotating left/right (<code style="font-family: monospace; color: #273540;">angular.z</code>).</p>
+        <h3>Differential Drive Kinematics</h3>
+        <p>Your robot has two independently driven wheels. To make the robot move at a specific linear velocity (<em>v</em>) and angular velocity (<em>&omega;</em>), we must calculate the required speed for the left wheel (<em>v<sub>L</sub></em>) and the right wheel (<em>v<sub>R</sub></em>). This mathematical translation is called inverse kinematics.</p>
+        <p>For a differential drive robot, the equations are:</p>
+        <ul>
+            <li><strong>Left wheel velocity:</strong> v<sub>L</sub> = v - (&omega;L / 2)</li>
+            <li><strong>Right wheel velocity:</strong> v<sub>R</sub> = v + (&omega;L / 2)</li>
+        </ul>
+        <p>Where:</p>
+        <ul>
+            <li><em>v</em> is the desired linear velocity (m/s)</li>
+            <li><em>&omega;</em> is the desired angular velocity (rad/s)</li>
+            <li><em>L</em> is the wheelbase, which is the distance between the two wheels (m)</li>
+        </ul>
+        <h3>PID Control Basics</h3>
+        <p>Once we calculate the desired <em>v<sub>L</sub></em> and <em>v<sub>R</sub></em>, we need to make sure the physical motors actually spin at those speeds. Due to battery voltage drops, friction, and varying terrain, sending a static power value to the motors will result in inconsistent speeds. We solve this using a closed-loop controller.</p>
+        <p>A PID controller calculates an error value <em>e(t)</em> as the difference between a desired setpoint (target velocity) and a measured process variable (actual velocity calculated from encoder counts). It then applies a correction based on three terms:</p>
+        <div style="background-color: #f1f3f5; padding: 15px; border-radius: 6px; margin: 20px 0px; text-align: center; border: 1px solid #e9ecef;"><strong>u(t) = K<sub>p</sub>e(t) + K<sub>i</sub>&int;e(t)dt + K<sub>d</sub>(de(t)/dt)</strong></div>
+        <ul>
+            <li><strong>Proportional (K<sub>p</sub>):</strong> Reacts to the present error. A larger error results in a larger immediate push.</li>
+            <li><strong>Integral (K<sub>i</sub>):</strong> Reacts to the accumulation of past errors. If the robot is slightly too slow for a long time, the integral term builds up to give it the extra nudge it needs to reach the target.</li>
+            <li><strong>Derivative (K<sub>d</sub>):</strong> Predicts future error based on the rate of change.</li>
+        </ul>
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0; font-style: italic; color: #555555;"><strong>Note on implementation:</strong> In practice, the derivative term is highly susceptible to sensor noise from the encoders, which can cause erratic twitching. Therefore, the PI Controller (omitting the D term by setting K<sub>d</sub>=0) is the most common and robust implementation for velocity tracking. It should also be noted that, while we will be implementing PI control in a ROS 2 node, such controllers are typically implemented on the low-level driver (the Romi32U4 in our case) due to the time-critical nature of control feedback loops. The choice to implement PI control in ROS 2 for this exercise was made to maintain educational clarity and workflow.</p>
+        </div>
+        <h3>Safety and Professional Responsibility: The Risks of Control</h3>
+        <p>As a robotics engineer, your code is the bridge between mathematical abstraction and physical action. In a lab setting, a poorly tuned PID loop might just result in a robot bumping into a table or spinning in circles. However, in industrial or public-facing applications, the stakes are significantly higher.</p>
+        <ul>
+            <li><strong>Public Safety and Physical Harm:</strong> Inadequate control design in autonomous vehicles, delivery drones, or surgical robots can lead to catastrophic failure.</li>
+            <li><strong>Instability:</strong> A divergent PID loop, where the gains are too high, causes oscillations that grow in magnitude. On a Romi, this looks like shaking; on a full-size autonomous vehicle, this could mean a violent swerve.</li>
+            <li><strong>Latency:</strong> If your control loop is too slow or sluggish, the robot cannot react to an emergency stop in time.</li>
+            <li><strong>Anti-Windup:</strong> In the provided starter code, there is a block of code for integral anti-windup. Without this, if a robot&rsquo;s wheel is physically stuck, the integral term will grow while trying to correct the error. Once the robot is freed, it can release that stored error as a sudden spike in motor output.</li>
+        </ul>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">Procedure</span></h2>
+        <h3>1. Complete the Velocity Controller</h3>
+        <p>Use the provided code to get started. Your primary software task is to complete this node by implementing the commented &ldquo;TODO&rdquo; sections. This node acts as a middleman between the high-level Twist commands and the low-level I2C hardware.</p>
+        <ol>
+            <li>Assuming you cloned the repo as instructed in Lab 1, open the starter code in VS Code (using WSL extension):<br />
+                <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">code ~/ros2_ws/src/ROMI-ROS2/romi_base/romi_base/base_controller_node.py</pre>
+            </li>
+            <li>Complete the <strong>Lab 2 TODO: Inverse Kinematics</strong> section. This <code style="font-family: monospace; color: #273540;">twist_callback()</code> function is where we process the <code style="font-family: monospace; color: #273540;">Twist</code> messages received from the <code style="font-family: monospace; color: #273540;">/cmd_vel</code> topic. You must implement the inverse differential drive equations to convert the incoming Twist message into desired left and right wheel velocities.</li>
+            <li>Complete the <strong>Lab 2 TODO: Sensor Conversion</strong> section. Inside the <code style="font-family: monospace; color: #273540;">encoder_callback()</code> function, we receive <code style="font-family: monospace; color: #273540;">Int32MultiArray</code> messages from the <code style="font-family: monospace; color: #273540;">/encoder_ticks</code> topic, allowing us to extract encoder counts, use them to calculate actual wheel velocities, evaluate error between target velocities, and then call the <code style="font-family: monospace; color: #273540;">calculate_pi_pwm()</code> function to get new PWM setpoints for the wheels.</li>
+            <li>Complete the <strong>Lab 2 TODO: PI Controller</strong> section. This is the helper function called in the step above that, using the accumulating error and dt, calculates new PWM setpoints for the motor you specify. Write the logic to update the integral accumulator(s), then calculate new PWM values using the PI equation.</li>
+        </ol>
+        <h3>2. Create the Automated Square Test Node</h3>
+        <p>After your velocity controller is working with keyboard teleoperation, create a separate ROS 2 Python node that automatically sends velocity commands to make your robot drive in a<strong> 2 ft x 2 ft square</strong>.</p>
+        <p>This test node will publish <code style="font-family: monospace; color: #273540;">geometry_msgs/msg/Twist</code> messages to the <code style="font-family: monospace; color: #273540;">/cmd_vel</code> topic. The robot should drive forward one foot, turn 90 degrees, and repeat this process four times.</p>
+        <p>Create the file in the existing <code style="font-family: monospace; color: #273540;">romi_base</code> Python package at this exact location:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">~/ros2_ws/src/ROMI-ROS2/romi_base/romi_base/square_test_node.py</pre>
+        <p>Copy and paste the following code into <code style="font-family: monospace; color: #273540;">square_test_node.py</code>:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">#!/usr/bin/env python3
+
+import time
+
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+
+
+class SquareTestNode(Node):
+    def __init__(self):
+        super().__init__('square_test_node')
+
+        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+
+        # Commanded robot velocities
+        self.forward_speed = 0.10      # meters per second
+        self.turn_speed = 0.75         # radians per second
+
+        # Desired square dimensions
+        self.side_length = 0.6096 &nbsp; &nbsp; &nbsp;# meters, equal to 2 ft
+        self.turn_angle = 1.5708       # radians, equal to 90 degrees
+
+        # Motion durations are calculated from commanded velocities.
+        # Tune the velocity controller, not these timing calculations.
+        self.forward_time = self.side_length / self.forward_speed
+        self.turn_time = self.turn_angle / self.turn_speed
+
+        self.get_logger().info('Square test node started.')
+        self.get_logger().info(f'Forward time: {self.forward_time:.2f} seconds')
+        self.get_logger().info(f'Turn time: {self.turn_time:.2f} seconds')
+
+        time.sleep(2.0)
+
+        self.drive_square()
+        self.stop_robot()
+
+        self.get_logger().info('Square test complete.')
+
+    def publish_cmd_for_duration(self, linear_x, angular_z, duration):
+        msg = Twist()
+        msg.linear.x = linear_x
+        msg.angular.z = angular_z
+
+        start_time = time.time()
+
+        while time.time() - start_time &lt; duration:
+            self.cmd_pub.publish(msg)
+            time.sleep(0.05)
+
+        self.stop_robot()
+        time.sleep(0.5)
+
+    def stop_robot(self):
+        msg = Twist()
+        msg.linear.x = 0.0
+        msg.angular.z = 0.0
+
+        for _ in range(10):
+            self.cmd_pub.publish(msg)
+            time.sleep(0.05)
+
+    def drive_square(self):
+        for side in range(4):
+            self.get_logger().info(f'Driving side {side + 1}')
+            self.publish_cmd_for_duration(self.forward_speed, 0.0, self.forward_time)
+
+            self.get_logger().info(f'Turning corner {side + 1}')
+            self.publish_cmd_for_duration(0.0, self.turn_speed, self.turn_time)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = SquareTestNode()
+    node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
+</pre>
+        <h3>3. Add the Square Test Node to setup.py</h3>
+        <p>For <code style="font-family: monospace; color: #273540;">ros2 run</code> to find your new node, you must add it to the package entry points.</p>
+        <p>Open this file:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">~/ros2_ws/src/ROMI-ROS2/romi_base/setup.py</pre>
+        <p>Find the <code style="font-family: monospace; color: #273540;">entry_points</code> section. Inside the <code style="font-family: monospace; color: #273540;">console_scripts</code> list, add this line:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">'square_test_node = romi_base.square_test_node:main',</pre>
+        <p>Your <code style="font-family: monospace; color: #273540;">console_scripts</code> section should look similar to this. Your file may contain other nodes, which is fine. Do not delete the existing entries.</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">entry_points={
+    'console_scripts': [
+        'base_controller_node = romi_base.base_controller_node:main',
+        'square_test_node = romi_base.square_test_node:main',
+    ],
+},</pre>
+        <h3>4. Sync and Rebuild the Project</h3>
+        <p>Save your changes, connect to your Pi&rsquo;s Romi-XXXX network (Password: <code style="font-family: monospace; color: #273540;">romi32u4</code>), navigate to your workspace, and re-sync your code to the Raspberry Pi:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws/src/ROMI-ROS2
+./scripts/sync_to_pi.sh</pre>
+        <p>Then SSH into the Raspberry Pi:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1</pre>
+        <p>On the Raspberry Pi, rebuild the ROS 2 workspace so the new node appears when using <code style="font-family: monospace; color: #273540;">ros2 run</code>:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws
+colcon build --packages-select romi_base
+source install/setup.bash</pre>
+        <p>If <code style="font-family: monospace; color: #273540;">ros2 run romi_base square_test_node</code> does not work after rebuilding, make sure you added the node to <code style="font-family: monospace; color: #273540;">setup.py</code>, rebuilt the package, and sourced <code style="font-family: monospace; color: #273540;">install/setup.bash</code>.</p>
+        <h3>5. Running the Stack</h3>
+        <p>Open an SSH terminal (<code style="font-family: monospace; color: #c71f23;">ssh student@192.168.4.1</code>, Password: <code style="font-family: monospace; color: #273540;">romi32u4</code>) and a WSL terminal (VS Code opens a WSL terminal when you connect to your distro, so you can use this).</p>
+        <ul>
+            <li><strong>On Pi (SSH Terminal):</strong> Spin up the astar_bridge and base_controller nodes using a ROS 2 launch configuration written for you:
+                <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch romi_base romi_core.launch.py</pre>
+            </li>
+            <li><strong>On your Laptop (WSL):</strong> Launch the standard ROS 2 keyboard teleoperation node. This node captures your keyboard presses and publishes the Twist messages that your velocity controller is waiting for:
+                <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run teleop_twist_keyboard teleop_twist_keyboard</pre>
+            </li>
+            <li><strong>Square Test:</strong> After rebuilding and sourcing the workspace, run the automated square test node:
+                <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run romi_base square_test_node</pre>
+            </li>
+        </ul>
+        <h3>6. Tuning</h3>
+        <p>With the robot safely on the ground, use the keys indicated by <code style="font-family: monospace; color: #273540;">teleop_twist_keyboard</code> to send velocity commands (Twist messages).</p>
+        <ul>
+            <li>If your robot behaves erratically, is unresponsive, or oscillates violently, you will need to tune your K<sub>p</sub> and K<sub>i</sub> gains.</li>
+            <li>Get started by uncommenting the Dashboard Logging code underneath the code where we publish setpoints to the motors. Use the logs printed by <code style="font-family: monospace; color: #273540;">base_controller_node</code> to help you tune your gains.</li>
+            <li><strong>Tip:</strong> Start with K<sub>i</sub> at 0. Increase K<sub>p</sub> until the wheels respond snappily to your commands but do not oscillate. Then, slowly increase K<sub>i</sub> until the wheels accurately reach and hold the target speed under physical resistance.</li>
+        </ul>
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;"><strong>Important:</strong> The square test is intended to evaluate whether your velocity controller causes the robot to match commanded Twist velocities. The forward and turn durations are calculated from the commanded velocity values. If your robot does not complete the square accurately, do not change the timing values in the square test node to hide the problem. Instead, tune your velocity controller gains and verify that the measured wheel speeds match the commanded wheel speeds.</p>
+        </div>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+        <p>Demonstrate that your completed velocity controller can respond to both manual and automated Twist commands.</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+            <thead>
+                <tr style="background-color: #004b87; color: white;">
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Physical Action Required</th>
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Expected Observation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Manual Twist Control<br />(30 pts)</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">Use <code style="font-family: monospace; color: #273540;">teleop_twist_keyboard</code> to manually command the robot to drive forward, stop, rotate, and stop again.</td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">The Romi responds correctly to the keyboard commands, showing that your inverse kinematics and velocity controller are working.</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>PI Controller Accuracy<br />(30 pts)</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">Drive the robot forward using a Twist command while observing the terminal output from your controller.</td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">The terminal logs should show that the measured wheel speeds approach the commanded target speeds. The values do not need to be perfect, but they should show valid closed-loop behavior.</td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Automated Square Test<br />(40 pts)</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">Run your square test node using <code style="font-family: monospace; color: #273540;">ros2 run romi_base square_test_node</code>. The robot should attempt to drive in a 2 ft x 2 ft square.</td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">The robot should complete the square and stop within <strong>6 inches</strong> of its starting position. Your demonstration video must clearly show the starting position, final position, and approximate distance between them.</td>
+                </tr>
+            </tbody>
+        </table>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">How to Submit</span></h2>
+        <p>Take a video of your solution working. In your video, be sure to clearly demonstrate and explain all requirements of your working code.</p>
+        <p>Your demonstration video must include:</p>
+        <ul>
+            <li>Your robot responding to manual Twist commands.</li>
+            <li>Your terminal output showing closed-loop velocity control behavior.</li>
+            <li>Your robot running the automated square test node.</li>
+            <li>A clear view of the robot&rsquo;s starting position and final position.</li>
+            <li>Evidence that the robot stops within 6 inches of its starting position after completing the square test.</li>
+        </ul>
+        <p>Upload your video to <strong>YouTube only</strong> (do not use Google Drive or other platforms) and then provide a link within your code submission as a comment. Remember to include your name, program details, etc., within the program header at the top. It is common coding practice to provide a program header, so make sure you do this. If you used an example template, remember to delete the previous program header and replace it with your own.</p>
+        <p><img src="https://instructure.charlotte.edu/courses/270262/files/33333798/preview" alt="image.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33333798" data-api-returntype="File" /></p>
+        <p>Save your Python node as a <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">text file (.txt)</code> using Notepad, Word, etc. Save your text file as <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab#.txt</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">#</code> being the current lab you are submitting.</p>
+        <p>Submit this text file (.txt) to Canvas.</p>
+        <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> No other submission files will be accepted. You will only have two attempts to submit during the submission deadline. If a second attempt is needed, make sure all the necessary changes are made before submitting, as this would be your final attempt.</blockquote>
+    </div>
+</div>

@@ -1,0 +1,148 @@
+<div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
+    <h2><span style="color: #004b87;">Objective</span></h2>
+    <p>In this lab, you will expand your robot&rsquo;s capabilities from simple motion execution to <strong>dead reckoning</strong>. You will implement odometry, allowing the robot to estimate its position (<em>x, y</em>) and orientation (<em>&theta;</em>) in the world based solely on wheel encoder data. You will then publish this state estimate using standard ROS2 odometry and TF messages so the robot&rsquo;s estimated motion can be visualized in RViz.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Required Materials</span></h2>
+    <ul>
+        <li>Romi32U4 Robot</li>
+        <li>Raspberry Pi 4B</li>
+        <li>&ge; 32GB MicroSD Card flashed with the preconfigured image</li>
+        <li>Laptop, Windows preferred</li>
+        <li>6x AA Batteries</li>
+    </ul>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Background</span></h2>
+    <h3>What is Odometry?</h3>
+    <p>Odometry is the use of motion sensor data to estimate a robot&rsquo;s change in position over time. For the Romi, we use the wheel encoders to estimate how far each wheel has traveled. By combining these individual wheel distances with the robot&rsquo;s differential drive kinematics, we can estimate the robot&rsquo;s overall <strong>pose</strong>, which includes position and heading relative to its starting location.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; font-style: italic; color: #555555;"><strong>Note:</strong> Odometry estimates motion by repeatedly adding small changes in position. This means small errors can accumulate over time. Wheel slip, uneven floors, inaccurate wheel diameter, and small wheelbase errors can all cause odometry drift.</p>
+    </div>
+    <h3>Forward Kinematics and Path Integration</h3>
+    <p>In Lab 2, you used inverse kinematics to convert a desired robot velocity into left and right wheel velocities. In this lab, we do the reverse: we use measured left and right wheel motion to estimate how the robot moved.</p>
+    <p>To calculate the robot&rsquo;s new position, we translate the wheel distances (<em>d<sub>L</sub></em> and <em>d<sub>R</sub></em>) into a change in the robot&rsquo;s pose:</p>
+    <ul>
+        <li><strong>Linear displacement:</strong> the average distance traveled by the center of the robot.
+            <div style="margin: 10px 0; padding-left: 20px;"><strong style="font-size: 1.1em; color: #111111;">&Delta;s = (d<sub>L</sub> + d<sub>R</sub>) / 2</strong></div>
+        </li>
+        <li><strong>Angular displacement:</strong> the change in the robot&rsquo;s heading.
+            <div style="margin: 10px 0; padding-left: 20px;"><strong style="font-size: 1.1em; color: #111111;">&Delta;&theta; = (d<sub>R</sub> - d<sub>L</sub>) / L</strong></div>
+            <span style="font-size: 0.9em; color: #666666;">where <em>L</em> is the wheelbase distance between the two wheels.</span>
+        </li>
+    </ul>
+    <p>Using these displacements, we update the robot&rsquo;s pose at every time step:</p>
+    <div style="background-color: #f1f3f5; padding: 15px 15px 15px 30px; border-radius: 6px; font-family: 'Courier New', Courier, monospace; font-size: 1.1em; margin: 20px 0px; border: 1px solid #e9ecef;">x<sub>new</sub> = x<sub>old</sub> + &Delta;s &middot; cos(&theta;<sub>old</sub>)<br />y<sub>new</sub> = y<sub>old</sub> + &Delta;s &middot; sin(&theta;<sub>old</sub>)<br />&theta;<sub>new</sub> = &theta;<sub>old</sub> + &Delta;&theta;</div>
+    <h3>Why Use the Square Test?</h3>
+    <p>In Lab 2, you created a square test node that commands the robot to drive in a 2 ft x 2 ft square using <code style="font-family: monospace; color: #273540;">Twist</code> messages. In this lab, you will use that same square motion to verify your odometry implementation.</p>
+    <p>This is useful because the robot should return close to its starting position after completing the square. If your odometry is working correctly, RViz should show an estimated path that looks like a square, and the final estimated pose should be close to the starting pose.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Procedure</span></h2>
+    <h3>1. Open the Code Workspace</h3>
+    <p>We will build directly on the velocity controller node you completed in Lab 2.</p>
+    <ol>
+        <li>Boot your laptop, connect to your Romi&rsquo;s network, and launch VS Code.</li>
+        <li>Using the WSL extension, open your workspace.</li>
+        <li>Locate your control node file at:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">~/ros2_ws/src/ROMI-ROS2/romi_base/romi_base/base_controller_node.py</pre>
+        </li>
+    </ol>
+    <h3>2. Programming Task</h3>
+    <p>Locate your <code style="font-family: monospace; color: #273540;">encoder_callback()</code> method. Scroll down to the bottom of this function, immediately after you have calculated and published <code style="font-family: monospace; color: #273540;">pwm_left</code> and <code style="font-family: monospace; color: #273540;">pwm_right</code>. Find the following target section:</p>
+    <div style="background-color: #272822; color: #f8f8f2; font-family: 'Consolas', 'Courier New', Courier, monospace; padding: 20px; border-radius: 6px; font-size: 0.95em; margin: 20px 0;"><span style="color: #75715e;"># ---------------------------------------------------------</span><br /><span style="color: #75715e;"># LAB 3 TODO: SECTION B - ODOMETRY AND TF</span><br /><span style="color: #75715e;"># ---------------------------------------------------------</span><br /><span style="color: #75715e;"># 1. Calculate the center distance traveled (delta_s) and change in angle (delta_theta)</span><br />delta_s = <span style="color: #ae81ff;">0.0</span><br />delta_theta = <span style="color: #ae81ff;">0.0</span><br /><br /><span style="color: #75715e;"># 2. Update the robot's global pose (self.x, self.y, self.theta)</span><br />self.x += <span style="color: #ae81ff;">0.0</span><br />self.y += <span style="color: #ae81ff;">0.0</span><br />self.theta += <span style="color: #ae81ff;">0.0</span><br /><br /><span style="color: #75715e;"># 3. Calculate current global linear velocity (v) and angular velocity (w)</span><br />v = <span style="color: #ae81ff;">0.0</span><br />w = <span style="color: #ae81ff;">0.0</span><br /><br /><span style="color: #75715e;"># 4. Uncomment the line below to publish the updated values</span><br /><span style="color: #75715e;"># self.publish_odometry(current_time, v, w)</span></div>
+    <p>Complete the mathematical implementation according to these requirements:</p>
+    <ul>
+        <li><strong>Displacements:</strong> Calculate <code style="font-family: monospace; color: #273540;">delta_s</code> and <code style="font-family: monospace; color: #273540;">delta_theta</code> using the wheel distance variables <code style="font-family: monospace; color: #273540;">d_left</code> and <code style="font-family: monospace; color: #273540;">d_right</code> from your Lab 2 sensor conversion work.</li>
+        <li><strong>Pose State:</strong> Use the pose update equations to continuously accumulate values into <code style="font-family: monospace; color: #273540;">self.x</code>, <code style="font-family: monospace; color: #273540;">self.y</code>, and <code style="font-family: monospace; color: #273540;">self.theta</code>.</li>
+        <li><strong>Velocities:</strong> Calculate the robot&rsquo;s current linear velocity <em>v</em> and angular velocity <em>w</em>. Add a safety check for <code style="font-family: monospace; color: #273540;">dt &lt;= 0</code> to avoid divide-by-zero errors.</li>
+        <li><strong>Publishing:</strong> Uncomment the final method call so your node publishes odometry and broadcasts the TF transform.</li>
+    </ul>
+    <h3>3. Sync and Rebuild the Project</h3>
+    <ol>
+        <li>Save your file modifications in VS Code.</li>
+        <li>In your local WSL terminal, navigate to your workspace and sync the updated project to the Raspberry Pi:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws/src/ROMI-ROS2
+./scripts/sync_to_pi.sh</pre>
+        </li>
+        <li>SSH into the Raspberry Pi:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1</pre>
+        </li>
+        <li>On the Raspberry Pi, rebuild and source the workspace:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws
+colcon build --packages-select romi_base
+source install/setup.bash</pre>
+        </li>
+    </ol>
+    ```
+    <h3>4. Launch the Robot Stack</h3>
+    <p>In the SSH terminal connected to the Raspberry Pi, launch the Romi core stack:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch romi_base romi_core.launch.py</pre>
+    <p>This launch file should start the hardware bridge and your base controller node.</p>
+    <h3>5. Launch RViz</h3>
+    <p>Open a local WSL terminal on your laptop and launch RViz:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">rviz2</pre>
+    <p>Configure RViz as follows:</p>
+    <ul>
+        <li>In the upper-left panel, set the <strong>Fixed Frame</strong> to <code style="font-family: monospace; color: #273540;">odom</code>.</li>
+        <li>Click <strong>Add</strong>.</li>
+        <li>Select the <strong>By Topic</strong> tab.</li>
+        <li>Add the <code style="font-family: monospace; color: #273540;">/odom</code> topic.</li>
+        <li>Click <strong>Add</strong> again.</li>
+        <li>Add a <code style="font-family: monospace; color: #273540;">TF</code> display.</li>
+    </ul>
+    <h3>6. Run the Square Test Node</h3>
+    <p>Instead of manually driving a circular path or an L-shaped path, this lab uses the automated square test node from Lab 2 as the odometry verification motion.</p>
+    <p>Place the robot on the floor and clearly mark its starting position. Make sure there is enough open space for the robot to drive a 2 ft x 2 ft square.</p>
+    <p>In a terminal where the workspace has been sourced, run:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run romi_base square_test_node</pre>
+    <p>The robot should drive forward, turn 90 degrees, and repeat until it has attempted a complete square. As the robot moves, RViz should update the robot&rsquo;s estimated path using your odometry calculations.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Important:</strong> Do not modify the square test timing values to make the odometry appear better. The square test is being used as a consistent verification motion. If the physical robot does not track the square well, tune the Lab 2 velocity controller. If RViz does not show a reasonable square-shaped path, debug your Lab 3 odometry implementation.</p>
+    </div>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+    <p>Use the automated square test node to verify that your odometry implementation is working. Your video must show both the physical robot and the RViz visualization.</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+        <thead>
+            <tr style="background-color: #004b87; color: white;">
+                <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Physical Action Required</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Expected Observation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Odometry Publishing<br />(30 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Launch the Romi core stack and RViz with the fixed frame set to <code style="font-family: monospace; color: #273540;">odom</code>. Add the <code style="font-family: monospace; color: #273540;">/odom</code> and <code style="font-family: monospace; color: #273540;">TF</code> displays.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">RViz should show odometry data and a transform between the <code style="font-family: monospace; color: #273540;">odom</code> frame and the robot&rsquo;s <code style="font-family: monospace; color: #273540;">base_link</code> frame.</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Square Path Visualization<br />(40 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Run the automated square test node using <code style="font-family: monospace; color: #273540;">ros2 run romi_base square_test_node</code>.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">The path shown in RViz should resemble a square. The estimated robot pose should move forward, rotate at each corner, and return close to its starting pose after the fourth side.</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Physical and Estimated Motion Comparison<br />(30 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Record the physical robot completing the square test while also showing RViz tracking the robot&rsquo;s estimated path.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">The physical robot should attempt a 2 ft x 2 ft square, and the RViz odometry path should correspond to the same general square motion. Some drift is acceptable, but the visualization should clearly match the physical motion direction and sequence.</td>
+            </tr>
+        </tbody>
+    </table>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">How to Submit</span></h2>
+    <p>Take a video of your solution working. In your video, clearly demonstrate and explain all requirements of your working code.</p>
+    <p>Your video must include:</p>
+    <ul>
+        <li>Your completed odometry code running as part of the Romi base controller.</li>
+        <li>RViz configured with <code style="font-family: monospace; color: #273540;">odom</code> as the fixed frame.</li>
+        <li>The <code style="font-family: monospace; color: #273540;">/odom</code> display visible in RViz.</li>
+        <li>The <code style="font-family: monospace; color: #273540;">TF</code> display visible in RViz.</li>
+        <li>The robot running the automated square test node.</li>
+        <li>The RViz visualization showing the estimated square-shaped path.</li>
+        <li>A clear comparison between the physical robot motion and the RViz odometry path.</li>
+    </ul>
+    <p>Upload your video to <strong>YouTube only</strong>. Do not use Google Drive or other platforms. Provide the YouTube link within your code submission as a comment. Remember to include your name, program details, and any required course information in the program header at the top of your submitted file. If you used an example template, delete the previous program header and replace it with your own.</p>
+    <p><img id="33208743" style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33208743/preview" alt="exampleHeader.jpg" width="736" height="356" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33208743" data-api-returntype="File" /></p>
+    <p>Save your Python node as a <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">text file (.txt)</code> using Notepad, Word, etc. Save your text file as <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab#.txt</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">#</code> being the current lab number.</p>
+    <p>Submit this text file (.txt) to Canvas.</p>
+    <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> No other submission files will be accepted. You will only have two attempts to submit during the submission deadline. If a second attempt is needed, make sure all necessary changes are made before submitting, as this would be your final attempt.</blockquote>
+    ```
+</div>

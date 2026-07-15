@@ -1,0 +1,191 @@
+<div id="dp-wrapper" class="dp-wrapper">
+    <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
+        <h2><span style="color: #004b87;">Objective</span></h2>
+        <p>In this exercise, you will set up the toolchain to enable the robotics architecture below:</p>
+        <div style="text-align: center; margin: 20px 0;"><img id="33191322" style="max-width: 100%; height: auto; border-radius: 6px; padding: 10px; background-color: #ffffff; border: 1px solid #dddddd;" src="https://instructure.charlotte.edu/courses/270262/files/33191322/preview" alt="sysArch.png" width="669" height="473" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33191322" data-api-returntype="File" /></div>
+        <p>Upon completion, you will have verified the toolchain end-to-end, and will have taken your first steps in a foundational understanding of Robot Operating System 2 (ROS2) architecture.</p>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">Required Materials</span></h2>
+        <ul>
+            <li>Romi32U4 Control Board (Included with Romi32U4 robot kit)</li>
+            <li>Micro USB Cable</li>
+            <li>Laptop (Windows preferable)</li>
+            <li>Raspberry Pi 4B</li>
+            <li>&ge; 32GB MicroSD card (+ adapter for laptop if needed)</li>
+            <li>6x AA Batteries</li>
+        </ul>
+        <p style="font-style: italic; color: #555555;">Romi32U4 robots are provided in the lab, but you can check out the <a style="color: #004b87;" title="Course Materials" href="https://instructure.charlotte.edu/courses/270262/pages/course-materials-2" data-course-type="wikiPages" data-published="true" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/pages/course-materials-2" data-api-returntype="Page">Course Materials</a> page to buy your own!</p>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">Background</span></h2>
+        <h3>System Architecture</h3>
+        <p>In the diagram pictured above:</p>
+        <ul>
+            <li><strong>The Raspberry Pi 4B</strong> acts as the "Brain." It handles high-level intelligence&mdash;such as processing LiDAR data or calculating motion plans&mdash;using the robust ROS 2 ecosystem.</li>
+            <li><strong>The Romi 32U4 Control Board</strong> acts as the "Nervous System." It is a dedicated microcontroller responsible only for low-level execution, such as generating PWM signals for motors and counting raw encoder pulses.</li>
+            <li><strong>Your Windows Laptop</strong> acts as the "Mission Control." It provides a remote console to launch software, visualize sensor data, and send manual override commands.</li>
+        </ul>
+        <p>This is a classic robotics paradigm where the "thinking" is separate from the "doing." By letting a low-level controller handle the fast, repetitive task of spinning motors, the main computer stays free to focus on computationally heavy tasks like navigation and obstacle avoidance.</p>
+        <h3>ROS2 Basics</h3>
+        <p>ROS2 (Robot Operating System) is not actually an operating system like Windows or Linux, but can be thought of as a sophisticated communication framework. Its primary job is to provide a standardized way for different software programs, potentially running on different computers, to talk to one another. In the context of the Romi robot, ROS2 allows your Windows laptop and a Raspberry Pi to work together as a single cohesive unit. Instead of writing complex networking code to send data over Wi-Fi, ROS 2 handles the "plumbing" in the background, allowing you to focus on the logic of your robotics applications.</p>
+        <p>The fundamental building blocks of this communication are <strong>Nodes</strong> and <strong>Topics</strong>. A Node is a small, specialized program designed to perform one specific task&mdash;such as reading encoder counts, blinking an LED, or processing sensor data. For these nodes to share information, they use Topics, which act like dedicated "bus routes" or radio channels. One node "Publishes" data to a topic, while any other node interested in that data "Subscribes" to it. For example, in this lab, your laptop will run a node that publishes a command to a topic, and the Raspberry Pi will subscribe to that same topic to trigger a physical action on the Romi. This "Publisher-Subscriber" model is what makes ROS 2 incredibly flexible; you can add or remove nodes without ever having to rewrite the entire system.</p>
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;">In this exercise, we will put this Publisher-Subscriber model into practice to verify your cross-device toolchain. You will launch a setup logic node on your Windows laptop that acts as the high-level controller, publishing commands to a dedicated topic called <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/leds</code>. Simultaneously, the Raspberry Pi will run a hardware bridge node that subscribes to this topic, listening for those messages and translating them into low-level hardware signals. By successfully observing the physical LEDs on the Romi board toggle in sync with the output on your laptop terminal, you will confirm that your entire communication pipeline is properly configured and fully operational.</p>
+        </div>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">Procedure</span></h2>
+        <p>To set up the robot and toolchain, we will follow the steps below:</p>
+        <ol>
+            <li>Assemble the robot kit</li>
+            <li>Install Arduino IDE to flash a program to the Romi32U4 Control Board</li>
+            <li>Flash a &ldquo;golden image&rdquo; to your SD card for use in Raspberry Pi</li>
+            <li>Install ROS2 on your Windows laptop in Windows Subsystem for Linux (WSL)</li>
+            <li>Install and configure VS Code for code development</li>
+            <li>Validate basic inter-device communication</li>
+        </ol>
+        <h3>Step 1.0: Assemble the Robot</h3>
+        <p><strong>IMPORTANT:</strong> Step 1 is only needed for those who obtained their own personal Romi32U4 robot kits. If you are using the provided robots in the lab, you may proceed to Step 2.</p>
+        <p>If you are assembling your own robot at home, check out the <a style="color: #004b87;" title="Romi Assembly Guide" href="https://instructure.charlotte.edu/courses/270262/pages/romi-assembly-guide" data-course-type="wikiPages" data-published="true" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/pages/romi-assembly-guide" data-api-returntype="Page">assembly guide</a> first! If you are using one of the robots provided on campus, you can skip the assembly step.</p>
+        <h3>Step 1.1: Install Arduino IDE</h3>
+        <ul>
+            <li>Go to <a class="inline_disabled" style="color: #004b87;" href="https://www.arduino.cc/en/software/" target="_blank" rel="noopener">Arduino&rsquo;s website</a> to download Arduino IDE.</li>
+            <li>Select the version that corresponds to your operating system.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200901/preview" alt="image4-1.png" width="808" height="398" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200901" data-api-returntype="File" /></li>
+            <li>Once downloaded, run the installer. On Windows, the file should be named something like &ldquo;arduino-ide_&lt;version number&gt;_Windows_64bit.exe&rdquo;.</li>
+            <li>Once run, the installation wizard will take you through several steps to install Arduino IDE.</li>
+            <li>After you click &ldquo;Finish&rdquo; and launch Arduino IDE, you may be prompted to install a variety of drivers and grant device permissions. Most of these are not required for this course, but if you are comfortable, it is safest to greenlight everything.</li>
+        </ul>
+        <h3>Step 1.2: Set Up Arduino IDE for Romi32U4</h3>
+        <h4>Install Windows Drivers</h4>
+        <p>Before connecting a Pololu 32U4 board to your Windows machine, install the drivers first.</p>
+        <ol>
+            <li>Download the <a class="inline_disabled" style="color: #004b87;" href="https://www.pololu.com/file/0J1240/a-star-windows-1.3.0.0.zip" target="_blank" rel="noopener">A-Star Windows Drivers</a> and extract the zip to a temporary folder.</li>
+            <li>Open the &ldquo;a-star-windows&rdquo; folder.</li>
+            <li>Right-click on &ldquo;a-star.inf&rdquo; and click &ldquo;Install.&rdquo;<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200903/preview" alt="image6.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200903" data-api-returntype="File" /></li>
+        </ol>
+        <h4>Add Pololu A-Star Board Support</h4>
+        <p>To enable support for the Pololu Romi32U4, you will need to add Pololu&rsquo;s board package URL to the Arduino IDE using the Boards Manager.</p>
+        <ol>
+            <li>Go to File &gt; Preferences &gt; Settings.</li>
+            <li>Find &ldquo;Additional boards manager URLs.&rdquo;</li>
+            <li>Copy and paste the following URL: <br /><code style="background-color: #f4f4f4; padding: 4px 8px; border-radius: 4px; color: #273540; font-family: monospace; display: inline-block; margin-top: 5px;">https://files.pololu.com/arduino/package_pololu_index.json</code><br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200904/preview" alt="image8.png" width="590" height="371" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200904" data-api-returntype="File" /></li>
+            <li>Click &ldquo;OK&rdquo;.</li>
+            <li>In Tools &gt; Board &gt; Boards Manager, search for &ldquo;Pololu A-Star Boards&rdquo;.</li>
+            <li>Select the latest version and click &ldquo;Install&rdquo;.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200905/preview" alt="image7.png" width="592" height="297" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200905" data-api-returntype="File" /></li>
+        </ol>
+        <p>You should now be able to select your board by clicking &ldquo;Select Board&rdquo; and searching for &ldquo;Pololu A-Star 32U4&rdquo;.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200906/preview" alt="image2.png" width="617" height="443" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200906" data-api-returntype="File" /></p>
+        <h4>Install the Romi32U4 Library</h4>
+        <p>Finally, you should install the Romi32U4 library, which helps programmers easily interface with all of the on-board hardware on the control board.</p>
+        <ol>
+            <li>Go to Sketch &gt; Include Library &gt; Manage Libraries.</li>
+            <li>Search for &ldquo;Romi32U4&rdquo;.</li>
+            <li>Select the latest version and click &ldquo;Install&rdquo;.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200907/preview" alt="image3.png" width="582" height="284" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200907" data-api-returntype="File" /></li>
+        </ol>
+        <h3>Step 1.3: Program the Romi</h3>
+        <p>We now need to flash the <a id="33207353" class="instructure_file_link inline_disabled" style="color: #004b87;" href="https://instructure.charlotte.edu/courses/270262/files/33207353?wrap=1" target="_blank" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33207353" data-api-returntype="File" rel="noopener">RomiRPiSlaveDemo.ino</a> program to your Romi32U4. The program enables communication between the Romi32U4 and a Raspberry Pi via a shared I2C register. With this shared register in place, the Romi32U4 becomes a hardware interface that simply acts based on values in the register, while the Raspberry Pi is the one sending the high-level commands.</p>
+        <p>Download the <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">RomiRPiSlaveDemo.ino</code>, and open it in Arduino IDE. Click the &ldquo;Upload&rdquo; button to flash the program to the Romi32U4 Control Board.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200908/preview" alt="image1.png" width="582" height="612" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200908" data-api-returntype="File" /></p>
+        <h3>Step 2: Raspberry Pi Setup</h3>
+        <p>Now that the Romi is ready to talk to a Raspberry Pi, let&rsquo;s set one up. This process has been made as simple as possible for you:</p>
+        <ol>
+            <li>Download the <a class="instructure_file_link inline_disabled" style="color: #004b87;" title="romiPi20260528.img.xz" href="https://instructure.charlotte.edu/courses/270262/files/33245485?wrap=1" target="_blank" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33245485" data-api-returntype="File" rel="noopener">Class Pi Image</a>. This .img.xz file contains a preconfigured Ubuntu 22.04 operating system with all the dependencies you will need for the class already installed and system-level configurations already made.</li>
+            <li>Download and install <a class="inline_disabled" style="color: #004b87;" href="https://www.raspberrypi.com/software/" target="_blank" rel="noopener">Raspberry Pi imager</a>.</li>
+            <li>Mount your SD card in Windows.</li>
+            <li>In Raspberry Pi Imager:
+                <ul>
+                    <li>Select &ldquo;Raspberry Pi 4&rdquo; as device.</li>
+                    <li>Under OS selection, scroll to the bottom and select &ldquo;Use Custom.&rdquo;</li>
+                    <li>Find and select the .img.xz file you downloaded in Step 1.</li>
+                    <li>Under Storage selection, select your SD card.</li>
+                    <li>Flash the image.</li>
+                </ul>
+            </li>
+        </ol>
+        <p>Your SD card is now ready to be inserted into a Raspberry Pi 4B (we will do this later).</p>
+        <h3>Step 3: ROS 2 in WSL2</h3>
+        <p>ROS 2 workflow is the smoothest using Linux, so we will be using Windows Subsystem for Linux 2 (WSL2)&mdash;an extremely lightweight Linux VM&mdash;to host ROS 2.</p>
+        <ol>
+            <li>Open PowerShell as an administrator.</li>
+            <li>Run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">wsl --install</code></li>
+            <li>Run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">wsl --install -d Ubuntu-22.04</code></li>
+            <li>Ubuntu should launch after install &rarr; Set up your user/password as prompted.</li>
+            <li>After setting up user, run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">sudo apt update &amp;&amp; sudo apt install -y</code></li>
+            <li>Follow the steps <a class="inline_disabled" style="color: #004b87;" href="https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html" target="_blank" rel="noopener">here</a> to install ROS 2 (make sure to install the <strong>desktop</strong> version and the development tools).</li>
+        </ol>
+        <p><em>Once ROS 2 is installed in WSL2, you will want to add the setup script to your .bashrc to avoid having to source it every time you boot up WSL. Do this by running:</em></p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">echo "source /opt/ros/humble/setup.bash" &gt;&gt; ~/.bashrc</pre>
+        <p>We now need to ensure that multicast network communication can work properly:</p>
+        <ol>
+            <li>Open the WSL Settings GUI (press Windows key and search for this).</li>
+            <li>Navigate to the Networking settings, and ensure that "Networking mode" is set to "Mirrored".<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200910/preview" alt="wslSettings.jpg" width="930" height="243" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200910" data-api-returntype="File" /></li>
+            <li>Open PowerShell as an administrator.</li>
+            <li>Run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">Set-NetFirewallHyperVVMSetting -Name '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -DefaultInboundAction Allow</code><br /><span style="font-style: italic; color: #555555; font-size: 0.9em;">You may need to reboot your laptop to apply changes.</span></li>
+        </ol>
+        <p>Finally, pull down the source code for the lab:</p>
+        <ul>
+            <li>From PowerShell, open a WSL terminal by running <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">wsl</code></li>
+            <li>Navigate to your home directory by running <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">cd ~</code></li>
+            <li>Create a folder for your ROS 2 workspace using <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">mkdir -p ros2_ws/src</code></li>
+            <li>Navigate to the src folder using <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">cd ros2_ws/src</code></li>
+            <li>Run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">git clone -b lab1 https://github.com/UNCC-Embedded-Lab/ROMI-ROS2.git</code></li>
+        </ul>
+        <h3>Step 4: Install &amp; Configure VS Code</h3>
+        <p>For this class, it is recommended that you use VS Code (or a fork like Cursor) to develop code. The general workflow will be:</p>
+        <ul>
+            <li>Develop code on laptop using VS Code</li>
+            <li>Do what local testing is possible from laptop</li>
+            <li>Deploy code to RPi using <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">sync_to_pi.sh</code> (a shell script that has been written for you)</li>
+            <li>Test code using the full robotics stack</li>
+        </ul>
+        <p>In order to set up VS Code for our ROS 2 development:</p>
+        <ol>
+            <li>Install and open <a class="inline_disabled" style="color: #004b87;" href="https://code.visualstudio.com/download" target="_blank" rel="noopener">VS Code</a>.</li>
+            <li>When prompted to &ldquo;Select Additional Tasks&rdquo; during installation, be sure to check the "Add to PATH" option so you can easily open a folder in WSL using the code command.</li>
+            <li>Find the extensions menu and search for &ldquo;WSL&rdquo;.</li>
+            <li>Install the extension.</li>
+        </ol>
+        <p>Once this is complete, you can use VS Code for your code development by opening VS Code &gt; <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">Ctrl+Shift+P</code> &gt; search for and click on <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">WSL: Connect to WSL using Distro&hellip;</code> &gt; select the Ubuntu distribution that we installed earlier. After VS Code connects to WSL, you will see an option to &ldquo;Open Folder&rdquo; in the lefthand sidebar. Click it and open your <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/home/&lt;your username&gt;</code> directory when prompted. You are now able to navigate your Linux (WSL) filesystem from within VS Code.</p>
+        <h3>Step 5: End-to-End Validation</h3>
+        <p>You now have all the tools you will need to get started developing in ROS 2. We will begin by booting up a simple system that will blink some LEDs on the Romi32U4 Board.</p>
+        <h4>Hardware Assembly &amp; Power</h4>
+        <ul>
+            <li><strong>Seating the Pi:</strong> Mount the Raspberry Pi 4B onto the Romi32U4 pin header. It only fits in one orientation.</li>
+            <li><strong>Power:</strong> Insert your 6 AA batteries into the Romi chassis (open the compartment on the underside).</li>
+            <li><strong>Booting:</strong> The first boot takes a few minutes, so be patient. Once ready, the Pi creates a WiFi AP named &ldquo;Romi-XXXX&rdquo; (last 4 digits of Pi MAC address&mdash;labeled on Pi).</li>
+        </ul>
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; color: #856404;"><strong>Warning:</strong> USB power is insufficient for motors. Labs will require battery power to prevent the Pi from experiencing brownout resets.</div>
+        <h4>Connecting to the Robot</h4>
+        <ul>
+            <li>Join the &ldquo;Romi-XXXX&rdquo; WiFi network (Password: <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi32u4</code>).</li>
+            <li>Open PowerShell and SSH into the Pi via <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">ssh student@192.168.4.1</code> (Password: <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi32u4</code>).</li>
+        </ul>
+        <h4>Building the Workspace</h4>
+        <p>ROS 2 uses "workspaces" to organize code. You must build your workspace on both devices to create the necessary environment files.</p>
+        <p><strong>In WSL Terminal (Laptop):</strong></p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">cd ~/ros2_ws
+colcon build --symlink-install
+source ~/ros2_ws/install/setup.bash</pre>
+        <p>Deploy to the Pi by navigating to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">~/ros2_ws/src/ROMI-ROS2</code> and syncing your source code using the provided script (Password: <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi32u4</code>):</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">cd ~/ros2_ws/src/ROMI-ROS2
+./scripts/sync_to_pi.sh</pre>
+        <p>This script will sync the entire workspace from your WSL instance to your Raspberry Pi using <code style="font-family: monospace;">rsync</code> and automatically build the workspace using <code style="font-family: monospace;">colcon</code>.</p>
+        <p><strong>In SSH (Pi):</strong> AFTER completing the above step, open an SSH terminal and run:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ros2 pkg prefix romi_base</pre>
+        <p>If you see <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/home/student/ros2_ws/install/romi_base</code>, you have confirmed that the ROS 2 workspace was synced and built on your Pi successfully.</p>
+        <h4>Priming the ROS 2 Network</h4>
+        <p>Devices only communicate if they share the same Domain ID. In every new terminal window (WSL and SSH), run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">export ROS_DOMAIN_ID=&lt;x&gt;</code> where 0 &le; <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">x</code> &le; 232. Ensure that each terminal is assigned the identical Domain ID.<br /><span style="font-style: italic; color: #666666; font-size: 0.9em;">Note: ROS 2 uses ROS_DOMAIN_ID=0 by default.</span></p>
+        <h4>Verifying End-to-End Communication</h4>
+        <p>Verify the toolchain by completing and running a distributed <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">setup_test</code> program across your hardware:</p>
+        <p>With the repository cloned in WSL, navigate to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">~/ros2_ws/src/ROMI-ROS2/romi_base/romi_base/setup_test_node.py</code> in VS Code.<br />Follow the "TODO" comments in the code to complete the Python node, familiarizing yourself with the Romi hardware interface functions and ROS 2 messaging. When your code is complete, sync to your Pi using the <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">./scripts/sync_to_pi.sh</code> script and test:</p>
+        <p><strong>On the Pi (SSH):</strong> Launch the hardware interface node:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ros2 run romi_base astar_bridge</pre>
+        <p><strong>On the Laptop (WSL):</strong> Launch the logic node:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ros2 run romi_base setup_test</pre>
+        <h4>Observe the Output</h4>
+        <p>Your WSL terminal will print the robot status, and the physical LEDs on the Romi board should blink while motors spin (YELLOW + forward, GREEN + stop, RED + reverse). When you achieve this operation, you have confirmed your laptop, Pi, and Romi board are successfully communicating via ROS 2 topics and the provided I2C bridge!</p>
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+        <h2><span style="color: #004b87;">How to Submit</span></h2>
+        <p>Take a video of your solution working. In your video, be sure to clearly demonstrate and explain all requirements <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">(which are listed in the grading rubric below)</code> of your working code.</p>
+        <p>Upload your video to <strong>YouTube only</strong> (do not use Google Drive or other platforms) and then provide a link within your code submission as a comment like the picture shows below. Remember to include your name, program details, etc., within the program header at the top. It is common coding practice to provide a program header, so make sure you do this. If you used an example template, remember to delete the previous program header and replace it with your own.<br /><img id="33208743" style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33208743/preview" alt="exampleHeader.jpg" width="736" height="356" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33208743" data-api-returntype="File" /></p>
+        <p>Save your Python node as a <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">text file (.txt)</code> using Notepad, Word, etc. Save your text file as <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab#.txt</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">#</code> being the current lab you are submitting.</p>
+        <p>Submit this text file (.txt) to Canvas.</p>
+        <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> No other submission files will be accepted. You will only have two attempts to submit during the submission deadline. If a second attempt is needed, make sure all the necessary changes are made before submitting, as this would be your final attempt.</blockquote>
+    </div>
+</div>

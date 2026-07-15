@@ -1,0 +1,192 @@
+<div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding: 20px;">
+    <h2><span style="color: #004b87;">Objective</span></h2>
+    <p>In this lab, you will transition your Romi from a remotely controlled robot to an autonomous robot. You will use the RPLidar A1 to detect obstacles, process the incoming LiDAR data, and implement a simple reactive control loop that allows the robot to avoid walls and objects.</p>
+    <p>The final behavior will be similar to a basic robotic vacuum. The robot will drive forward when the path is clear, stop when an obstacle is detected in front of it, turn in place, and then resume driving once the path is clear again.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Required Materials</span></h2>
+    <ul>
+        <li>Romi32U4 Robot</li>
+        <li>Raspberry Pi 4B</li>
+        <li>&ge; 32GB MicroSD Card flashed with the preconfigured image</li>
+        <li>Laptop, Windows preferred</li>
+        <li>6x AA Batteries</li>
+        <li>RPLidar A1</li>
+    </ul>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Background</span></h2>
+    <h3>What is LiDAR?</h3>
+    <p>LiDAR stands for <strong>Light Detection and Ranging</strong>. A LiDAR sensor measures distance by sending out laser light and measuring the reflected signal. The RPLidar A1 spins continuously, allowing it to measure distances around the robot in a full 360-degree circle.</p>
+    <p>For this lab, you do not need to build a map or understand every detail of how the LiDAR works internally. You only need to use the distance measurements to answer one question:</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; font-style: italic; color: #555555;"><strong>Question:</strong> Is there something too close in front of the robot?</p>
+    </div>
+    <h3>The LaserScan Message</h3>
+    <p>In ROS2, the LiDAR data is published as a <code style="font-family: monospace; color: #273540;">sensor_msgs/msg/LaserScan</code> message on the <code style="font-family: monospace; color: #273540;">/scan</code> topic.</p>
+    <p>The most important part of this message is the <code style="font-family: monospace; color: #273540;">ranges</code> array. This array contains many distance measurements around the robot. For this lab, we will treat the scan as if it contains approximately 360 values, where each index corresponds to a direction around the robot.</p>
+    <ul>
+        <li><strong>Index 0:</strong> directly in front of the robot</li>
+        <li><strong>Index 90:</strong> directly to the left of the robot</li>
+        <li><strong>Index 180:</strong> directly behind the robot</li>
+        <li><strong>Index 270:</strong> directly to the right of the robot</li>
+    </ul>
+    <p>Each value in the array is a distance measurement in meters. A smaller number means an object is closer to the robot.</p>
+    <h3>Only Looking at the Front Arc</h3>
+    <p>The LiDAR can see all around the robot, but the robot does not need to react to every object around it. If there is a wall behind the robot, the robot should not stop driving forward. For obstacle avoidance, we only care about objects in the direction the robot is trying to move.</p>
+    <p>To do this, we only examine a small region in front of the robot. This region is called the <strong>front arc</strong>.</p>
+    <p>Because the scan wraps around from 359 degrees back to 0 degrees, the front arc is split across the beginning and end of the array:</p>
+    <ul>
+        <li><code style="font-family: monospace; color: #273540;">msg.ranges[0:20]</code> looks slightly to the left of straight ahead.</li>
+        <li><code style="font-family: monospace; color: #273540;">msg.ranges[340:360]</code> looks slightly to the right of straight ahead.</li>
+    </ul>
+    <p>These two slices are combined so the robot can check only the area directly in front of itself.</p>
+    <h3>Filtering Bad Sensor Data</h3>
+    <p>Real sensors are not perfect. Sometimes the LiDAR may return values that should not be used for decision making. For example, it may report <code style="font-family: monospace; color: #273540;">0.0</code>, <code style="font-family: monospace; color: #273540;">inf</code>, or another invalid value when the sensor does not receive a useful reflection.</p>
+    <p>If invalid values are not filtered out, the robot may think there is an obstacle directly in front of it even when the path is clear. This can cause the robot to stop, spin, or stutter in open space.</p>
+    <h3>Reactive Control</h3>
+    <p>This lab uses a simple control strategy called <strong>reactive control</strong>. A reactive robot does not build a map or plan a complete path. Instead, it reacts directly to its current sensor readings.</p>
+    <ul>
+        <li><strong>Sense:</strong> Read the latest LiDAR scan.</li>
+        <li><strong>Think:</strong> Check whether the closest object in front of the robot is too close.</li>
+        <li><strong>Act:</strong> Drive forward if the path is clear. Turn in place if an obstacle is detected.</li>
+    </ul>
+    <p>This is not an advanced navigation system, but it is an important first step toward autonomous robotics.</p>
+    <h3>Overview of the Obstacle Avoidance Node</h3>
+    <p>The course package already includes an incomplete node named <code style="font-family: monospace; color: #273540;">obstacle_avoidance_node.py</code>. This file is part of the <code style="font-family: monospace; color: #273540;">romi_base</code> package.</p>
+    <p>This node has three main jobs:</p>
+    <ul>
+        <li>Subscribe to the LiDAR scan topic, <code style="font-family: monospace; color: #273540;">/scan</code>.</li>
+        <li>Decide whether the robot should drive forward or turn.</li>
+        <li>Publish velocity commands to <code style="font-family: monospace; color: #273540;">/cmd_vel</code>.</li>
+    </ul>
+    <p>The node already contains the basic ROS2 structure. You do not need to create a new file from scratch. Your job is to complete the missing logic inside the LiDAR callback function.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Important:</strong> A callback function is a function that automatically runs when new data arrives. In this lab, the LiDAR callback runs every time a new <code style="font-family: monospace; color: #273540;">/scan</code> message is received.</p>
+    </div>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Procedure</span></h2>
+    <h3>1. Open the Code Workspace</h3>
+    <ol>
+        <li>Boot your laptop and connect to your Romi network.</li>
+        <li>Launch VS Code.</li>
+        <li>Using the WSL extension, open your ROS2 workspace.</li>
+        <li>Locate the obstacle avoidance node at:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">~/ros2_ws/src/ROMI-ROS2/romi_base/romi_base/obstacle_avoidance_node.py</pre>
+        </li>
+    </ol>
+    <h3>2. Inspect the Existing Node</h3>
+    <p>Before writing code, read through the file and identify the major parts of the node.</p>
+    <ul>
+        <li><code style="font-family: monospace; color: #273540;">self.publisher</code> is used to send velocity commands to <code style="font-family: monospace; color: #273540;">/cmd_vel</code>.</li>
+        <li><code style="font-family: monospace; color: #273540;">self.subscription</code> is used to receive LiDAR data from <code style="font-family: monospace; color: #273540;">/scan</code>.</li>
+        <li><code style="font-family: monospace; color: #273540;">forward_speed</code> controls how fast the robot drives forward.</li>
+        <li><code style="font-family: monospace; color: #273540;">turning_speed</code> controls how fast the robot rotates when avoiding an obstacle.</li>
+        <li><code style="font-family: monospace; color: #273540;">safe_dist</code> controls how close an object is allowed to be before the robot reacts.</li>
+    </ul>
+    <p>These parameters allow the robot behavior to be adjusted without changing the main structure of the program.</p>
+    <h3>3. Complete the LiDAR Callback</h3>
+    <p>Navigate to the <code style="font-family: monospace; color: #273540;">lidar_callback()</code> function. This is where you will complete the obstacle avoidance logic.</p>
+    <p>Your code should perform the following steps:</p>
+    <ol>
+        <li><strong>Slice the front arc.</strong><br />Create two lists from the scan data:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">front_left = msg.ranges[0:20]
+front_right = msg.ranges[340:360]</pre>
+        </li>
+        <li><strong>Combine the two lists.</strong><br />These two slices represent the area directly in front of the robot.</li>
+        <li><strong>Filter invalid measurements.</strong><br />Remove values that are not useful for obstacle detection. At minimum, remove values that are too small to be real measurements.</li>
+        <li><strong>Check whether valid data exists.</strong><br />If there are no valid measurements, the function should return without commanding motion.</li>
+        <li><strong>Find the closest object.</strong><br />Use <code style="font-family: monospace; color: #273540;">min()</code> to find the closest valid distance in the front arc.</li>
+        <li><strong>Compare the closest object to the safety threshold.</strong><br />Use:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">safe_threshold = self.get_parameter('safe_dist').value</pre>
+        </li>
+        <li><strong>Create and publish a Twist command.</strong><br />If the closest object is too close, command the robot to turn. Otherwise, command the robot to drive forward.</li>
+    </ol>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Important:</strong> Do not make the robot turn because it sees something behind it or beside it. Only the front arc should be used for this lab.</p>
+    </div>
+    <h3>4. Sync and Rebuild the Project</h3>
+    <ol>
+        <li>Save your file modifications in VS Code.</li>
+        <li>In your local WSL terminal, navigate to the repository:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws/src/ROMI-ROS2</pre>
+        </li>
+        <li>Sync the updated project to the Raspberry Pi using the same sync script used in previous labs:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">./scripts/sync_to_pi.sh</pre>
+        </li>
+        <li>SSH into the Raspberry Pi:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1</pre>
+        </li>
+        <li>On the Raspberry Pi, rebuild and source the workspace:
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws
+colcon build --packages-select romi_base
+source install/setup.bash</pre>
+        </li>
+    </ol>
+    <h3>5. Launch the Robot Stack</h3>
+    <p>This lab requires the robot base controller, LiDAR driver, and obstacle avoidance node to run at the same time.</p>
+    <p>Use separate SSH terminals connected to the Raspberry Pi.</p>
+    <p><strong>Terminal 1 &mdash; LiDAR Driver</strong></p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch rplidar_ros rplidar_a1_launch.py</pre>
+    <p><strong>Terminal 2 &mdash; Romi Core Stack</strong></p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch romi_base romi_core.launch.py</pre>
+    <p><strong>Terminal 3 &mdash; Obstacle Avoidance Node</strong></p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run romi_base obstacle_avoidance_node</pre>
+    <p>Once all nodes are running, place the robot on the floor in an open area with enough space to move safely.</p>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0;"><strong>Safety:</strong> Be ready to pick up the robot or stop the program if it drives toward a person, table leg, wall, or cable. This is a simple reactive controller and it will not behave perfectly in every situation.</p>
+    </div>
+    <h3>6. Test the Behavior</h3>
+    <p>Test the robot in three stages.</p>
+    <ol>
+        <li><strong>Open space test:</strong> Place the robot in open space. It should drive forward smoothly.</li>
+        <li><strong>Obstacle test:</strong> Place a solid object in front of the robot within the safety distance. The robot should stop and turn.</li>
+        <li><strong>Recovery test:</strong> Allow the robot to turn until the front arc is clear. It should automatically resume driving forward.</li>
+    </ol>
+    <p>If the robot constantly spins in open space, check your filtering logic. If the robot drives into obstacles, check which part of the LiDAR scan is being used as the front arc.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+    <p>Use the completed obstacle avoidance node to verify that your robot can react to obstacles using LiDAR data.</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+        <thead>
+            <tr style="background-color: #004b87; color: white;">
+                <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Physical Action Required</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Expected Observation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>LiDAR Data Filtering<br />(30 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Place the robot in open space with no nearby obstacles directly in front of it.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">The robot should drive forward smoothly without constantly stopping, stuttering, or spinning because of invalid LiDAR readings.</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Obstacle Detection<br />(35 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Place a solid object directly in front of the robot within the configured safety distance, such as 0.5 meters.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">The robot should stop moving forward and begin rotating in place.</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Autonomous Recovery<br />(35 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Allow the robot to continue turning until the obstacle is no longer inside the front arc.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">The robot should automatically resume forward motion without keyboard control or manual intervention.</td>
+            </tr>
+        </tbody>
+    </table>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">How to Submit</span></h2>
+    <p>Take a video of your solution working. In your video, clearly demonstrate and explain all requirements of your working code.</p>
+    <p>Your video must include:</p>
+    <ul>
+        <li>Your completed <code style="font-family: monospace; color: #273540;">obstacle_avoidance_node.py</code> running on the Raspberry Pi.</li>
+        <li>The RPLidar driver running.</li>
+        <li>The Romi core stack running.</li>
+        <li>The robot driving forward in open space.</li>
+        <li>The robot detecting an obstacle placed directly in front of it.</li>
+        <li>The robot stopping and turning to avoid the obstacle.</li>
+        <li>The robot automatically resuming forward motion after the front arc becomes clear.</li>
+        <li>A brief explanation of how your code uses the LiDAR scan to decide whether to drive forward or turn.</li>
+    </ul>
+    <p>Upload your video to <strong>YouTube only</strong>. Do not use Google Drive or other platforms. Provide the YouTube link within your code submission as a comment. Remember to include your name, program details, and any required course information in the program header at the top of your submitted file. If you used an example template, delete the previous program header and replace it with your own.</p>
+    <p><img id="33208743" style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33208743/preview" alt="exampleHeader.jpg" width="736" height="356" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33208743" data-api-returntype="File" /></p>
+    <p>Save your Python node as a <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">text file (.txt)</code> using Notepad, Word, etc. Save your text file as <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab#.txt</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">#</code> being the current lab number.</p>
+    <p>Submit this text file (.txt) to Canvas.</p>
+</div>

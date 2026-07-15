@@ -1,0 +1,166 @@
+<div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding: 20px;">
+    <h2><span style="color: #004b87;">Objective</span></h2>
+    <p>In this lab, you will use a pre-built SLAM algorithm to generate a 2D occupancy grid map of a real environment with your Romi robot. You will drive the robot through the space manually while the SLAM system processes LiDAR data in real time to build and refine the map. At the end of the lab, you will save the completed map to disk for use in future work.</p>
+    <p>This lab focuses on <strong>using</strong> an existing SLAM implementation rather than implementing one yourself. Your primary responsibilities are configuring the software stack, driving the robot effectively, and producing a clean, complete map of the environment.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Required Materials</span></h2>
+    <ul>
+        <li>Romi32U4 Robot</li>
+        <li>Raspberry Pi 4B</li>
+        <li>&ge; 32GB MicroSD Card flashed with the preconfigured image</li>
+        <li>Laptop, Windows preferred</li>
+        <li>6x AA Batteries</li>
+        <li>RPLidar A1</li>
+        <li>A mappable environment (see note below)</li>
+    </ul>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Environment Note:</strong> An in-person mapping environment will be provided during the scheduled lab session. If you are completing this lab outside of class, find a room in your home that has clear walls and enough open floor space for the robot to drive through. A hallway, bedroom, or living room all work well. Avoid rooms with large open doorways on all sides, as the LiDAR needs walls nearby to build a useful map.</p>
+    </div>
+    <p><img src="https://instructure.charlotte.edu/courses/270262/files/33545968/preview" alt="image.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33545968" data-api-returntype="File" /></p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Background</span></h2>
+    <h3>What is SLAM?</h3>
+    <p><strong>SLAM</strong> stands for <strong>Simultaneous Localization and Mapping</strong>. It is a core capability in mobile robotics that allows a robot to answer two questions at the same time:</p>
+    <ul>
+        <li><strong>Where am I?</strong> (localization)</li>
+        <li><strong>What does the environment look like?</strong> (mapping)</li>
+    </ul>
+    <p>These two problems are intertwined. To build an accurate map, the robot needs to know where it is. But to know where it is, the robot needs a map to compare against. SLAM algorithms solve both problems simultaneously by continuously updating the map and the robot&rsquo;s estimated position together as new sensor data arrives.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; font-style: italic; color: #555555;"><strong>Note:</strong> SLAM is an active area of robotics research. This lab uses a well-established, production-quality SLAM implementation so you can focus on the practical aspects of running and using SLAM rather than the underlying mathematics.</p>
+    </div>
+    <h3>The Occupancy Grid Map</h3>
+    <p>The type of map produced by this lab is called an <strong>occupancy grid</strong>. The environment is divided into a uniform grid of cells, and each cell is assigned one of three states:</p>
+    <ul>
+        <li><strong>Occupied (black):</strong> A wall or obstacle was detected at this cell.</li>
+        <li><strong>Free (white):</strong> The LiDAR measured through this cell, meaning it is open space.</li>
+        <li><strong>Unknown (gray):</strong> The robot has not yet gathered enough data to classify this cell.</li>
+    </ul>
+    <p>As the robot explores the environment, more and more cells transition from unknown to either occupied or free. A complete map will have very few gray areas remaining.</p>
+    <h3>The slam_toolbox Package</h3>
+    <p>This lab uses <code style="font-family: monospace; color: #273540;">slam_toolbox</code>, a widely used open-source ROS2 SLAM package. It subscribes to the LiDAR scan topic and the robot&rsquo;s odometry topic, and publishes a continuously updated occupancy grid map on the <code style="font-family: monospace; color: #273540;">/map</code> topic. It also broadcasts the transform between the <code style="font-family: monospace; color: #273540;">map</code> frame and the <code style="font-family: monospace; color: #273540;">odom</code> frame, which connects the robot&rsquo;s localization estimate to the map coordinate system.</p>
+    <p>The package will be run in <strong>online asynchronous</strong> mode. In this mode, slam_toolbox processes incoming sensor data as fast as it can without holding up the rest of the robot system. This is the recommended mode for running SLAM on a live robot.</p>
+    <h3>Driving Strategy for Good Map Quality</h3>
+    <p>Because the robot is manually driven during this lab, the quality of the resulting map depends on how you drive. Keep the following in mind:</p>
+    <ul>
+        <li><strong>Drive slowly and smoothly.</strong> Fast or jerky motion reduces the quality of the LiDAR scan data and makes it harder for SLAM to track the robot&rsquo;s position accurately.</li>
+        <li><strong>Expose all walls.</strong> Drive the robot close enough to each wall in the environment so the LiDAR can clearly measure it. Walls that are only partially seen will appear incomplete.</li>
+        <li><strong>Revisit areas.</strong> Driving the robot back through areas it has already mapped helps slam_toolbox correct small errors and close loops. This is called <strong>loop closure</strong>.</li>
+        <li><strong>Avoid covering the LiDAR.</strong> Your hands, cables, or other objects should not block the spinning sensor while the robot is mapping.</li>
+    </ul>
+    <h3>How the Map is Saved</h3>
+    <p>Once you are satisfied with the map, you will save it using the <code style="font-family: monospace; color: #273540;">map_saver_cli</code> tool from the <code style="font-family: monospace; color: #273540;">nav2_map_server</code> package. This tool reads the current occupancy grid from the <code style="font-family: monospace; color: #273540;">/map</code> topic and writes two files to disk:</p>
+    <ul>
+        <li><strong><code style="font-family: monospace; color: #273540;">.pgm</code> file:</strong> A grayscale image of the map. Black pixels are walls, white pixels are free space, and gray pixels are unknown.</li>
+        <li><strong><code style="font-family: monospace; color: #273540;">.yaml</code> file:</strong> Metadata that describes the map, including the resolution (meters per pixel), the origin of the map coordinate frame, and the file path to the image.</li>
+    </ul>
+    <p>Both files are required to fully describe a saved map. You will submit both files as part of this lab.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Procedure</span></h2>
+    <h3>1. Prepare the Robot and Connect</h3>
+    <ol>
+        <li>Insert charged batteries into the Romi and turn it on.</li>
+        <li>Connect your laptop to the Romi&rsquo;s Wi-Fi network. All ROS2 traffic will flow over this connection, so the robot stack running on the Pi and the software running locally on your laptop will automatically discover each other.</li>
+        <li>Open terminal windows as needed. You will use SSH to connect to the Raspberry Pi for robot-side software only. slam_toolbox, RViz, and teleoperation all run in your <strong>local WSL environment</strong>.</li>
+    </ol>
+    <h3>2. Launch the Romi Robot Stack</h3>
+    <p>In <strong>Terminal 1</strong>, SSH into the Raspberry Pi and launch the LiDAR driver:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
+ros2 launch rplidar_ros rplidar_a1_launch.py</pre>
+    <p>In <strong>Terminal 2</strong>, open a new SSH session and launch the Romi base controller and lidar:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
+ros2 launch romi_base romi_robot.launch.py</pre>
+    <p>Confirm that both terminals are running without error before continuing. The LiDAR should be spinning visibly on top of the robot.</p>
+    <h3>3. Launch slam_toolbox</h3>
+    <p>In a <strong>local WSL terminal</strong>, launch slam_toolbox in online asynchronous mode. This runs on your laptop and subscribes to the <code style="font-family: monospace; color: #273540;">/scan</code> and <code style="font-family: monospace; color: #273540;">/odom</code> topics published by the robot over the Wi-Fi network:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch slam_toolbox online_async_launch.py</pre>
+    <p>After a moment, slam_toolbox will begin publishing a map. You will not see any visual output in this terminal, but you should see log messages indicating that the node has started and is processing data.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Important:</strong> slam_toolbox requires both the <code style="font-family: monospace; color: #273540;">/scan</code> topic and the <code style="font-family: monospace; color: #273540;">/odom</code> topic to be actively publishing before it can operate. Make sure the LiDAR driver and the Romi core stack are fully running before launching slam_toolbox.</p>
+    </div>
+    <h3>4. Configure RViz</h3>
+    <p>In <strong>Terminal 4</strong> on your <strong>local WSL environment</strong>, launch RViz:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">rviz2</pre>
+    <p>Configure RViz to visualize the mapping process:</p>
+    <ol>
+        <li>In the upper-left panel, set the <strong>Fixed Frame</strong> to <code style="font-family: monospace; color: #273540;">map</code>.</li>
+        <li>Click <strong>Add</strong> &rarr; <strong>By Topic</strong> &rarr; select <code style="font-family: monospace; color: #273540;">/map</code> &rarr; click <strong>OK</strong>.</li>
+        <li>Click <strong>Add</strong> &rarr; <strong>By Topic</strong> &rarr; select <code style="font-family: monospace; color: #273540;">/scan</code> &rarr; click <strong>OK</strong>.</li>
+        <li>Click <strong>Add</strong> &rarr; <strong>By Display Type</strong> &rarr; select <strong>TF</strong> &rarr; click <strong>OK</strong>.</li>
+    </ol>
+    <p>If slam_toolbox is running correctly, a small gray square should appear in RViz, representing the initial unknown map centered at the robot&rsquo;s starting position. The LiDAR scan lines should also be visible, radiating outward from the robot.</p>
+    <h3>5. Drive the Robot to Build the Map</h3>
+    <p>Open a fifth terminal in your local WSL environment and launch the keyboard teleop node:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run teleop_twist_keyboard teleop_twist_keyboard</pre>
+    <p>Use the keyboard to drive the robot through the environment. Follow the driving strategy described in the Background section. Keep an eye on RViz as you drive &mdash; you should see the map growing in real time as the robot explores new areas.</p>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0;"><strong>Safety:</strong> Keep the teleop terminal in focus while driving. The robot will continue moving at its last commanded velocity if focus is lost. If the robot behaves unexpectedly, press <strong>S</strong> in the teleop terminal to send a zero-velocity command and stop the robot.</p>
+    </div>
+    <p>Continue driving until the map in RViz covers the full extent of the environment with minimal gray (unknown) areas remaining. A complete map will clearly show the room&rsquo;s walls as solid black lines enclosing a white interior.</p>
+    <h3>6. Save the Map</h3>
+    <p>Once you are satisfied with the map, stop driving the robot and leave all nodes running. In a <strong>local WSL terminal</strong>, save the map using the map saver tool. Because slam_toolbox is running locally, the map is saved directly to your WSL home directory:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run nav2_map_server map_saver_cli -f ~/map</pre>
+    <p>This will create two files in the home directory of your WSL environment:</p>
+    <ul>
+        <li><code style="font-family: monospace; color: #273540;">~/map.pgm</code> &mdash; the map image</li>
+        <li><code style="font-family: monospace; color: #273540;">~/map.yaml</code> &mdash; the map metadata</li>
+    </ul>
+    <p>Verify the files were created:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ls -lh ~/map.*</pre>
+    <p>Both files should be present and non-empty. The <code style="font-family: monospace; color: #273540;">.pgm</code> file will typically be several kilobytes in size. If it is 0 bytes, the map was not saved correctly and you should retry the save command while slam_toolbox is still running.</p>
+    <p>Open the <code style="font-family: monospace; color: #273540;">.pgm</code> file with an image viewer to visually confirm it looks like a reasonable map of the room before moving on to submission.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+    <p>Your submission must demonstrate that slam_toolbox was successfully run on the robot and that a usable map of the environment was produced and saved.</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+        <thead>
+            <tr style="background-color: #004b87; color: white;">
+                <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Physical Action Required</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Expected Observation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>SLAM Stack Running<br />(30 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Launch the LiDAR driver, Romi core stack, and slam_toolbox. Open RViz with the fixed frame set to <code style="font-family: monospace; color: #273540;">map</code> and add the <code style="font-family: monospace; color: #273540;">/map</code> and <code style="font-family: monospace; color: #273540;">/scan</code> displays.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">RViz shows an occupancy grid map that updates as the robot moves. The LiDAR scan rays are visible radiating from the robot&rsquo;s current position.</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Live Mapping Demonstration<br />(40 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Drive the robot through the environment while the camera captures both the physical robot moving and the RViz map growing in real time.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">The occupancy grid in RViz should visibly expand and refine as the robot explores new areas. Walls should appear as solid black lines. The robot&rsquo;s position in the map should correspond to its physical location.</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Complete Map Saved<br />(30 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">After mapping is complete, run the map saver command and verify the output files. Show the terminal output of the save command and open the <code style="font-family: monospace; color: #273540;">.pgm</code> file to visually confirm the saved map.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Both <code style="font-family: monospace; color: #273540;">map.pgm</code> and <code style="font-family: monospace; color: #273540;">map.yaml</code> are created and non-empty. The <code style="font-family: monospace; color: #273540;">.pgm</code> image clearly shows the mapped environment with walls visible and minimal unknown gray regions.</td>
+            </tr>
+        </tbody>
+    </table>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">How to Submit</span></h2>
+    <p>Take a video of your robot actively running the SLAM algorithm and building the map. Your video must show both the physical robot driving through the environment and the occupancy grid map updating in RViz at the same time.</p>
+    <p>Your video must include:</p>
+    <ul>
+        <li>The LiDAR driver, Romi core stack, and slam_toolbox all running without errors.</li>
+        <li>RViz configured with <code style="font-family: monospace; color: #273540;">map</code> as the fixed frame, showing the <code style="font-family: monospace; color: #273540;">/map</code> and <code style="font-family: monospace; color: #273540;">/scan</code> displays.</li>
+        <li>The robot being driven through the environment while the map visibly grows and updates in RViz.</li>
+        <li>The terminal output of the <code style="font-family: monospace; color: #273540;">map_saver_cli</code> command confirming both files were saved.</li>
+        <li>The saved <code style="font-family: monospace; color: #273540;">map.pgm</code> opened in an image viewer so the completed map is clearly visible.</li>
+    </ul>
+    <p>Upload your video to <strong>YouTube only</strong>. Do not use Google Drive or other platforms.</p>
+    <p>In addition to the video, you must also submit your two saved map files. Rename them using your name before submitting:</p>
+    <ul>
+        <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab5.pgm</code></li>
+        <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab5.yaml</code></li>
+    </ul>
+    <p>Open the <code style="font-family: monospace; color: #273540;">.yaml</code> file in a text editor and add your YouTube link as a comment at the top of the file, like this:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;"># Name: Firstname Lastname
+# Lab: Lab 5 - SLAM Mapping
+# YouTube: https://youtu.be/your_link_here
+image: lastname_firstname_lab5.pgm
+...</pre>
+    <p>Submit both the <code style="font-family: monospace; color: #273540;">.pgm</code> and <code style="font-family: monospace; color: #273540;">.yaml</code> files to Canvas.</p>
+    <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> No other submission files will be accepted. You will only have two attempts to submit during the submission deadline. If a second attempt is needed, make sure all necessary changes are made before submitting, as this would be your final attempt.</blockquote>
+</div>

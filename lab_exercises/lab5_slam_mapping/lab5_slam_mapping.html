@@ -64,33 +64,51 @@
         <li>Open terminal windows as needed. You will use SSH to connect to the Raspberry Pi for robot-side software only. slam_toolbox, RViz, and teleoperation all run in your <strong>local WSL environment</strong>.</li>
     </ol>
     <h3>2. Launch the Romi Robot Stack</h3>
-    <p>In <strong>Terminal 1</strong>, SSH into the Raspberry Pi and launch the LiDAR driver:</p>
-    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
-ros2 launch rplidar_ros rplidar_a1_launch.py</pre>
-    <p>In <strong>Terminal 2</strong>, open a new SSH session and launch the Romi base controller and lidar:</p>
+    <p>In <strong>Terminal 1</strong>, SSH into the Raspberry Pi and launch the Romi robot stack. The <code style="font-family: monospace; color: #273540;">romi_robot.launch.py</code> launch file starts both the Romi base controller node and the RPLidar driver node together, so you do not need a separate terminal for the LiDAR:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
 ros2 launch romi_base romi_robot.launch.py</pre>
-    <p>Confirm that both terminals are running without error before continuing. The LiDAR should be spinning visibly on top of the robot.</p>
+    <p>Confirm that the terminal is running without error before continuing. The LiDAR should be spinning visibly on top of the robot.</p>
     <h3>3. Launch slam_toolbox</h3>
-    <p>In a <strong>local WSL terminal</strong>, launch slam_toolbox in online asynchronous mode. This runs on your laptop and subscribes to the <code style="font-family: monospace; color: #273540;">/scan</code> and <code style="font-family: monospace; color: #273540;">/odom</code> topics published by the robot over the Wi-Fi network:</p>
+    <p>If you have not already installed slam_toolbox in your <strong>local WSL environment</strong>, install it now. The package is available as a prebuilt binary for ROS2 Humble:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">sudo apt update
+sudo apt install ros-humble-slam-toolbox</pre>
+    <p>You only need to install slam_toolbox once. In a <strong>local WSL terminal</strong>, launch slam_toolbox in online asynchronous mode. This runs on your laptop and subscribes to the <code style="font-family: monospace; color: #273540;">/scan</code> and <code style="font-family: monospace; color: #273540;">/odom</code> topics published by the robot over the Wi-Fi network:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch slam_toolbox online_async_launch.py</pre>
     <p>After a moment, slam_toolbox will begin publishing a map. You will not see any visual output in this terminal, but you should see log messages indicating that the node has started and is processing data.</p>
     <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <p style="margin: 0;"><strong>Important:</strong> slam_toolbox requires both the <code style="font-family: monospace; color: #273540;">/scan</code> topic and the <code style="font-family: monospace; color: #273540;">/odom</code> topic to be actively publishing before it can operate. Make sure the LiDAR driver and the Romi core stack are fully running before launching slam_toolbox.</p>
     </div>
+    <h4>Speeding Up the Map Update Rate</h4>
+    <p>By default, slam_toolbox only republishes the map every 5 seconds (the <code style="font-family: monospace; color: #273540;">map_update_interval</code> parameter). Because you will be manually driving the robot using the map in RViz as visual feedback, this default is too slow &mdash; the map in RViz will lag well behind the robot. Lower the interval so the map updates roughly once per second.</p>
+    <p>Instead of the launch command above, run the async slam_toolbox node directly and override the parameter on the command line. This uses the node&rsquo;s built-in defaults for everything else, so no separate parameter file is needed:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run slam_toolbox async_slam_toolbox_node --ros-args -p map_update_interval:=1.0</pre>
+    <p>Use this command <strong>in place of</strong> the <code style="font-family: monospace; color: #273540;">ros2 launch</code> command above &mdash; you only need one of them running.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Tip:</strong> Do not set <code style="font-family: monospace; color: #273540;">map_update_interval</code> too low (for example, below <code style="font-family: monospace; color: #273540;">0.5</code>). Publishing the full map too frequently over the Wi-Fi network can slow down the whole system and make RViz less responsive. A value of <code style="font-family: monospace; color: #273540;">1.0</code> gives smooth visual feedback without overloading the network.</p>
+    </div>
     <h3>4. Configure RViz</h3>
-    <p>In <strong>Terminal 4</strong> on your <strong>local WSL environment</strong>, launch RViz:</p>
+    <p>In <strong>Terminal 3</strong> on your <strong>local WSL environment</strong>, launch RViz:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">rviz2</pre>
     <p>Configure RViz to visualize the mapping process:</p>
     <ol>
-        <li>In the upper-left panel, set the <strong>Fixed Frame</strong> to <code style="font-family: monospace; color: #273540;">map</code>.</li>
-        <li>Click <strong>Add</strong> &rarr; <strong>By Topic</strong> &rarr; select <code style="font-family: monospace; color: #273540;">/map</code> &rarr; click <strong>OK</strong>.</li>
+        <li>In the <strong>Global Options</strong> section at the top of the Displays panel, set the <strong>Fixed Frame</strong> to <code style="font-family: monospace; color: #273540;">map</code>. If this field turns red, the <code style="font-family: monospace; color: #273540;">map</code> frame is not yet available &mdash; slam_toolbox is not running or has not received a scan yet.</li>
+        <li>Click <strong>Add</strong> &rarr; <strong>By display type</strong> &rarr; <strong>rviz_default_plugins</strong> &rarr; select <strong>Map</strong> &rarr; click <strong>OK</strong>. Expand the new <strong>Map</strong> display and set:
+            <ul>
+                <li><strong>Topic</strong> &rarr; <code style="font-family: monospace; color: #273540;">/map</code></li>
+                <li><strong>Topic &rarr; Durability Policy</strong> &rarr; <strong>Transient Local</strong></li>
+                <li><strong>Topic &rarr; Reliability Policy</strong> &rarr; <strong>Reliable</strong></li>
+            </ul>
+        </li>
         <li>Click <strong>Add</strong> &rarr; <strong>By Topic</strong> &rarr; select <code style="font-family: monospace; color: #273540;">/scan</code> &rarr; click <strong>OK</strong>.</li>
         <li>Click <strong>Add</strong> &rarr; <strong>By Display Type</strong> &rarr; select <strong>TF</strong> &rarr; click <strong>OK</strong>.</li>
     </ol>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0;"><strong>Critical:</strong> The Map display&rsquo;s <strong>Durability Policy</strong> must be set to <strong>Transient Local</strong>. slam_toolbox publishes the map as a latched (transient local) topic, so if this is left at the default <strong>Volatile</strong>, RViz will show no map even though <code style="font-family: monospace; color: #273540;">/map</code> is publishing. This is the most common reason a manually configured RViz fails to display the map.</p>
+    </div>
+    <p>Once configured correctly, save your RViz setup with <strong>File &rarr; Save Config As</strong> so you do not have to repeat these steps if RViz is restarted.</p>
     <p>If slam_toolbox is running correctly, a small gray square should appear in RViz, representing the initial unknown map centered at the robot&rsquo;s starting position. The LiDAR scan lines should also be visible, radiating outward from the robot.</p>
     <h3>5. Drive the Robot to Build the Map</h3>
-    <p>Open a fifth terminal in your local WSL environment and launch the keyboard teleop node:</p>
+    <p>Open a fourth terminal in your local WSL environment and launch the keyboard teleop node:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 run teleop_twist_keyboard teleop_twist_keyboard</pre>
     <p>Use the keyboard to drive the robot through the environment. Follow the driving strategy described in the Background section. Keep an eye on RViz as you drive &mdash; you should see the map growing in real time as the robot explores new areas.</p>
     <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">

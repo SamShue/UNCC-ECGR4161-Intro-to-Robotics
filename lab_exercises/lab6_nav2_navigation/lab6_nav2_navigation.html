@@ -1,0 +1,227 @@
+<div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding: 20px;">
+    <h2><span style="color: #004b87;">Objective</span></h2>
+    <p>In this lab, you will use the <strong>Nav2</strong> (ROS2 Navigation) stack to make your Romi robot drive itself autonomously through the environment you mapped in Lab 5. You will load your saved occupancy grid map, tell the robot where it is, and then simply click a destination. The navigation stack will plan a path, follow it, and avoid obstacles along the way &mdash; all without you driving the robot.</p>
+    <p>This lab focuses on <strong>running and observing</strong> a production-grade autonomous navigation system rather than implementing one. You will not write any navigation code. Your job is to launch the stack correctly, understand what each part of it does, and command the robot to reach goals on its own.</p>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Required Materials</span></h2>
+    <ul>
+        <li>Romi32U4 Robot</li>
+        <li>Raspberry Pi 4B</li>
+        <li>&ge; 32GB MicroSD Card flashed with the preconfigured image</li>
+        <li>Laptop, Windows preferred</li>
+        <li>6x AA Batteries</li>
+        <li>RPLidar A1</li>
+        <li>The saved map files (<code style="font-family: monospace; color: #273540;">.pgm</code> and <code style="font-family: monospace; color: #273540;">.yaml</code>) you produced in Lab 5</li>
+        <li>The same physical environment you mapped in Lab 5</li>
+    </ul>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0;"><strong>Prerequisite:</strong> This lab builds directly on Lab 5. You must have a completed, saved map before you begin. The robot can only localize and navigate inside an environment that matches its map, so you must run this lab in the <strong>same physical space</strong> you mapped, with furniture and walls in roughly the same positions.</p>
+    </div>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Background</span></h2>
+    <h3>From Mapping to Navigation</h3>
+    <p>In Lab 5 you used SLAM to answer two questions at once: <em>where am I</em> and <em>what does the environment look like</em>. Now that you already have a finished map, the problem changes. The map is fixed and known, so the robot no longer needs to build it. Instead it needs to:</p>
+    <ul>
+        <li><strong>Localize:</strong> figure out where it is <em>within the existing map</em>.</li>
+        <li><strong>Plan:</strong> compute a route from its current position to a goal you choose.</li>
+        <li><strong>Control:</strong> follow that route while reacting to obstacles that were not part of the original map.</li>
+    </ul>
+    <p>This is called <strong>autonomous navigation</strong>, and it is exactly what the Nav2 stack is built to do.</p>
+    <h3>What is Nav2?</h3>
+    <p><strong>Nav2</strong> is the standard navigation framework for ROS2. It is not a single program but a collection of coordinated nodes that together turn a goal like &ldquo;drive to that corner&rdquo; into safe, real-time wheel commands. Nav2 is used on real commercial robots &mdash; warehouse robots, delivery robots, and cleaning robots all run software organized this way.</p>
+    <p>Nav2 is powerful because it separates navigation into distinct, replaceable pieces. Each piece is a specialized server with one job. The sections below describe each part of the stack you will be running. <strong>Pay attention to these &mdash; the lecture covers the theory, and you will be asked to identify these components in your write-up.</strong></p>
+    <h3>The Parts of the Navigation Stack</h3>
+    <h4>1. Map Server</h4>
+    <p>The <strong>Map Server</strong> loads your saved <code style="font-family: monospace; color: #273540;">.pgm</code>/<code style="font-family: monospace; color: #273540;">.yaml</code> map from Lab 5 and publishes it on the <code style="font-family: monospace; color: #273540;">/map</code> topic. This is the fixed, known map of the world. Unlike Lab 5, this map does not change as the robot drives &mdash; it is the reference the robot navigates against.</p>
+    <h4>2. AMCL &mdash; Localization</h4>
+    <p><strong>AMCL</strong> stands for <strong>Adaptive Monte Carlo Localization</strong>. Its job is to answer &ldquo;where is the robot inside the known map?&rdquo; It does this using a <strong>particle filter</strong>: it maintains a cloud of hundreds of guesses (particles) about the robot&rsquo;s pose, then compares the live LiDAR scan against the map. Guesses that match the LiDAR well survive; guesses that match poorly are discarded. Over time the particle cloud converges tightly around the robot&rsquo;s true position.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Connection to your coursework:</strong> AMCL is the same particle-filter localization idea you studied in the particle filter project. In this lab you will watch that particle cloud converge live in RViz.</p>
+    </div>
+    <p>Because AMCL cannot know where the robot starts on its own, <strong>you</strong> will give it a rough starting pose by clicking on the map. From there it refines the estimate automatically as the robot moves.</p>
+    <h4>3. Costmaps &mdash; the Global and Local Costmap</h4>
+    <p>A <strong>costmap</strong> is a version of the map where every cell is assigned a &ldquo;cost&rdquo; that represents how dangerous or undesirable it is for the robot to be there. Walls have very high cost, open space has low cost, and cells near walls have a medium <strong>inflation</strong> cost that keeps the robot from clipping corners. Nav2 uses two costmaps:</p>
+    <ul>
+        <li><strong>Global Costmap:</strong> covers the entire map. It is built mostly from your static Lab 5 map and is used for long-range route planning.</li>
+        <li><strong>Local Costmap:</strong> a small window that moves with the robot. It is built from the live LiDAR scan and is used to react to obstacles that are not in the static map &mdash; a backpack on the floor, a person&rsquo;s legs, a chair that was moved.</li>
+    </ul>
+    <h4>4. Planner Server &mdash; the Global Planner</h4>
+    <p>The <strong>global planner</strong> computes a complete route from the robot&rsquo;s current position all the way to the goal, using the global costmap. It searches the map for the shortest safe path, treating the problem like finding a route through a maze. Nav2&rsquo;s default global planner (<code style="font-family: monospace; color: #273540;">NavFn</code>) uses a Dijkstra/A*-style search over the costmap grid. The result is the long, smooth line you will see drawn from the robot to the goal in RViz.</p>
+    <p>The global planner is <strong>strategic</strong>: it plans the whole trip, but it does not directly drive the wheels and it does not react instantly to new obstacles.</p>
+    <h4>5. Controller Server &mdash; the Local Planner</h4>
+    <p>The <strong>local planner</strong> (also called the <strong>controller</strong>) is what actually drives the robot. It takes the global path and, using the local costmap, generates the real-time velocity commands sent to <code style="font-family: monospace; color: #273540;">/cmd_vel</code>. Nav2&rsquo;s default controller (the <code style="font-family: monospace; color: #273540;">DWB</code> controller) works by simulating many short candidate motions a fraction of a second into the future, scoring each one on how well it follows the global path and how well it avoids obstacles, and then executing the best one. It repeats this many times per second.</p>
+    <p>The local planner is <strong>tactical</strong>: it follows the global plan closely but continuously adjusts to stay on course and swerve around anything unexpected in the local costmap.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Key distinction:</strong> The <strong>global planner</strong> decides <em>which way to go</em> across the whole map. The <strong>local planner</strong> decides <em>how to actually move the wheels right now</em> to follow that route and dodge obstacles. Both run at the same time, at different rates and different scopes.</p>
+    </div>
+    <h4>6. Behavior Tree Navigator (BT Navigator)</h4>
+    <p>The <strong>BT Navigator</strong> is the coordinator that ties everything together. It runs a <strong>behavior tree</strong> &mdash; a flowchart-like structure &mdash; that decides what to do and when: ask the global planner for a path, hand it to the controller, monitor progress, and decide what to do if something goes wrong. It is the &ldquo;brain&rdquo; that sequences the other servers.</p>
+    <h4>7. Behavior Server &mdash; Recovery Behaviors</h4>
+    <p>When the robot gets stuck &mdash; for example, boxed in by obstacles or unable to find a valid path &mdash; the BT Navigator triggers <strong>recovery behaviors</strong> from the Behavior Server. Typical recoveries include <strong>clearing the costmaps</strong> (in case bad sensor data made a phantom obstacle), <strong>spinning in place</strong> to look around, <strong>backing up</strong>, and <strong>waiting</strong> for a dynamic obstacle to move. These behaviors are what let the robot recover on its own instead of simply giving up.</p>
+    <h4>8. Lifecycle Manager</h4>
+    <p>All of these Nav2 nodes are <strong>managed (lifecycle) nodes</strong>, meaning they must be explicitly configured and activated in the correct order before navigation can start. The <strong>Lifecycle Manager</strong> handles this startup sequence automatically so all the servers come up cleanly together. When you launch Nav2, watch for a log message indicating that the lifecycle manager has <strong>activated</strong> the nodes &mdash; that is your signal the stack is ready.</p>
+    <h3>How These Parts Work Together</h3>
+    <p>The diagram below shows the flow from your click to the robot&rsquo;s wheels:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">You click a goal in RViz
+        &darr;
+BT Navigator  (coordinates everything)
+        &darr;
+Global Planner  &rarr;  computes full route using the Global Costmap (static Lab 5 map)
+        &darr;
+Local Planner   &rarr;  follows route + dodges obstacles using the Local Costmap (live LiDAR)
+        &darr;
+/cmd_vel  &rarr;  wheel velocity commands  &rarr;  Romi drives itself
+
+Meanwhile:  AMCL continuously answers "where am I in the map?" using the LiDAR.</pre>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Procedure</span></h2>
+    <h3>1. Prepare the Robot and Connect</h3>
+    <ol>
+        <li>Insert charged batteries into the Romi and turn it on.</li>
+        <li>Connect your laptop to the Romi&rsquo;s Wi-Fi network. As in Lab 5, ROS2 traffic flows over this connection, so the robot stack running on the Pi and the software running locally on your laptop will automatically discover each other.</li>
+        <li>Place the robot in the same environment you mapped in Lab 5. Note roughly where you are setting it down &mdash; you will need to tell Nav2 this starting location shortly.</li>
+    </ol>
+    <h3>2. Launch the Romi Robot Stack</h3>
+    <p>In <strong>Terminal 1</strong>, SSH into the Raspberry Pi and launch the Romi robot stack. As in Lab 5, this starts both the Romi base controller and the RPLidar driver, providing the <code style="font-family: monospace; color: #273540;">/scan</code> and <code style="font-family: monospace; color: #273540;">/odom</code> topics and the robot&rsquo;s transforms:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
+ros2 launch romi_base romi_robot.launch.py</pre>
+    <p>Confirm the terminal is running without error and the LiDAR is spinning before continuing.</p>
+    <h3>3. Make Sure Your Map is Available</h3>
+    <p>Nav2 needs to read the map you saved in Lab 5. It should already be in your <strong>local WSL</strong> home directory as <code style="font-family: monospace; color: #273540;">~/map.yaml</code> and <code style="font-family: monospace; color: #273540;">~/map.pgm</code>. Confirm both files are present:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ls -lh ~/map.yaml ~/map.pgm</pre>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>If you renamed your files for the Lab 5 submission</strong> (for example <code style="font-family: monospace; color: #273540;">lastname_firstname_lab5.yaml</code>), either copy them back to <code style="font-family: monospace; color: #273540;">~/map.yaml</code> and <code style="font-family: monospace; color: #273540;">~/map.pgm</code>, or simply use your actual filename in the launch command in the next step. The <code style="font-family: monospace; color: #273540;">.yaml</code> file&rsquo;s <code style="font-family: monospace; color: #273540;">image:</code> line must point to the matching <code style="font-family: monospace; color: #273540;">.pgm</code> file, and both must be in the same folder.</p>
+    </div>
+    <h3>4. Install Nav2 (One Time Only)</h3>
+    <p>If you have not already installed Nav2 in your <strong>local WSL environment</strong>, install it now. Like slam_toolbox, it is available as a prebuilt binary for ROS2 Humble:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">sudo apt update
+sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup</pre>
+    <p>You only need to do this once.</p>
+    <h3>5. Launch Nav2 with Your Map</h3>
+    <p>In a <strong>local WSL terminal (Terminal 2)</strong>, launch the full Nav2 stack and point it at your saved map. This single command brings up the Map Server, AMCL, both costmaps, the global planner, the local planner (controller), the BT Navigator, the Behavior Server, and the Lifecycle Manager &mdash; every component described in the Background:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch nav2_bringup bringup_launch.py \
+    use_sim_time:=false \
+    map:=$HOME/map.yaml</pre>
+    <p>Watch the log output. After a few seconds you should see the Lifecycle Manager report that it has <strong>activated</strong> the navigation nodes. This means the entire stack is up and running.</p>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0;"><strong>Important:</strong> The Romi stack from Step 2 must be running and publishing <code style="font-family: monospace; color: #273540;">/scan</code> and <code style="font-family: monospace; color: #273540;">/odom</code> <em>before</em> you launch Nav2. Nav2 needs live LiDAR and odometry to localize and to fill its local costmap. If the robot stack is not running, Nav2 will start but the robot will never be able to localize or move.</p>
+    </div>
+    <h3>6. Launch the Nav2 RViz View</h3>
+    <p>In a <strong>local WSL terminal (Terminal 3)</strong>, launch the preconfigured Nav2 RViz view. This RViz configuration already has all the navigation displays and the special goal tools set up for you:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch nav2_bringup rviz_launch.py</pre>
+    <p>You should see your Lab 5 map appear as a black-and-white occupancy grid. If the map does not appear, confirm that the fixed frame at the top of the Displays panel is set to <code style="font-family: monospace; color: #273540;">map</code> and that Nav2 launched without error.</p>
+    <p>Take a moment to locate these three tools in the RViz toolbar at the top of the window &mdash; you will use all of them:</p>
+    <ul>
+        <li><strong>2D Pose Estimate</strong> &mdash; used to tell AMCL where the robot starts.</li>
+        <li><strong>Nav2 Goal</strong> &mdash; used to command the robot to drive to a destination.</li>
+        <li><strong>Publish Point</strong> &mdash; not needed for this lab.</li>
+    </ul>
+    <h3>7. Set the Robot&rsquo;s Initial Pose</h3>
+    <p>AMCL does not yet know where the robot is on the map, so the robot&rsquo;s LiDAR scan will not line up with the map walls. You need to tell it the starting pose <strong>once</strong>:</p>
+    <ol>
+        <li>Look at where the robot physically is in the real room, and find that same spot on the map in RViz.</li>
+        <li>Click the <strong>2D Pose Estimate</strong> tool in the RViz toolbar.</li>
+        <li>Click on the map at the robot&rsquo;s location and <strong>drag in the direction the robot is actually facing</strong>, then release. The arrow you draw sets both position and heading.</li>
+    </ol>
+    <p>After you set the pose, you should see a cloud of small arrows (the AMCL <strong>particle cloud</strong>) appear around the robot, and the live LiDAR scan should snap into rough alignment with the map&rsquo;s walls.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Check your localization:</strong> The red/colored LiDAR points should lie roughly on top of the black walls of the map. If they are clearly rotated or offset, redo the 2D Pose Estimate more carefully. Good navigation is impossible if localization is wrong. Nudging the robot forward a short distance (using a teleop terminal, then closing it) helps the particle cloud tighten up.</p>
+    </div>
+    <h3>8. Send a Navigation Goal</h3>
+    <p>Now let the robot drive itself:</p>
+    <ol>
+        <li>Make sure there is a clear, reachable spot in the environment you want the robot to drive to.</li>
+        <li>Click the <strong>Nav2 Goal</strong> tool in the RViz toolbar.</li>
+        <li>Click a destination on the map and drag to set the final heading, then release.</li>
+    </ol>
+    <p>As soon as you release, Nav2 goes to work. You should observe, in order:</p>
+    <ul>
+        <li>A <strong>global path</strong> (a colored line) is drawn from the robot to the goal &mdash; this is the <strong>global planner</strong> output.</li>
+        <li>The robot begins driving on its own, and a shorter path or trajectory near the robot updates continuously &mdash; this is the <strong>local planner / controller</strong> at work.</li>
+        <li>The robot follows the route and arrives at the goal, then stops.</li>
+    </ul>
+    <p>You did not drive the robot &mdash; you only chose a destination. The stack handled planning, control, and localization automatically.</p>
+    <h3>9. Observe the Stack in Action</h3>
+    <p>Send the robot to several different goals around the environment and watch how the stack behaves. To clearly see each component, it helps to toggle these displays in the RViz Displays panel:</p>
+    <ul>
+        <li><strong>Global Costmap</strong> &mdash; the inflated map used for planning. Notice the &ldquo;buffer&rdquo; of cost around every wall.</li>
+        <li><strong>Local Costmap</strong> &mdash; the small window around the robot built from live LiDAR.</li>
+        <li><strong>Global Plan / Path</strong> &mdash; the full route from the global planner.</li>
+        <li><strong>Local Plan / Trajectory</strong> &mdash; the short-term path the controller is executing.</li>
+        <li><strong>AMCL Particle Cloud (PoseArray)</strong> &mdash; the localization particles.</li>
+    </ul>
+    <h3>10. Test Dynamic Obstacle Avoidance</h3>
+    <p>Send the robot toward a goal, then place a new obstacle in its path that was <strong>not</strong> part of the Lab 5 map &mdash; a shoe, a box, or your foot (carefully). Watch what happens:</p>
+    <ul>
+        <li>The obstacle appears in the <strong>local costmap</strong> as the LiDAR detects it.</li>
+        <li>The <strong>local planner</strong> steers around it while still heading toward the goal.</li>
+        <li>If the robot is fully blocked, a <strong>recovery behavior</strong> may trigger &mdash; you may see it clear its costmaps, spin in place, or back up before trying again.</li>
+    </ul>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0;"><strong>Safety:</strong> The robot is now moving under its own control. Keep the area clear of feet and cables, and stay ready to catch or power off the robot if it heads somewhere unsafe. Nav2 will not drive off a table edge on its own awareness &mdash; the LiDAR only sees walls, not drop-offs.</p>
+    </div>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+    <p>Your submission must demonstrate that you launched the Nav2 stack against your Lab 5 map, localized the robot, and commanded it to navigate autonomously to goals.</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+        <thead>
+            <tr style="background-color: #004b87; color: white;">
+                <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Physical Action Required</th>
+                <th style="padding: 12px; border: 1px solid #dddddd;">Expected Observation</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Nav2 Stack Running &amp; Localized<br />(30 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Launch the Romi stack, Nav2 with your Lab 5 map, and the Nav2 RViz view. Set the initial pose with the 2D Pose Estimate tool.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">RViz shows your saved map. After setting the initial pose, the AMCL particle cloud appears and the live LiDAR scan aligns with the map walls.</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Autonomous Point-to-Point Navigation<br />(40 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">Send the robot to at least two different goals using the Nav2 Goal tool, with the camera capturing both the physical robot and the RViz view.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">A global path is drawn to each goal, the robot drives itself along the route without being teleoperated, and it stops at each goal. The robot&rsquo;s position in RViz tracks its real position.</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Dynamic Obstacle Avoidance<br />(30 pts)</strong></td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">While the robot is navigating to a goal, place a new obstacle (not in the Lab 5 map) in its path.</td>
+                <td style="padding: 12px; border: 1px solid #dddddd;">The obstacle appears in the local costmap and the robot steers around it (or performs a recovery behavior) while still working toward the goal.</td>
+            </tr>
+        </tbody>
+    </table>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">Write-Up Questions</span></h2>
+    <p>Because the goal of this lab is to build intuition for the navigation stack, you must submit short written answers (2&ndash;4 sentences each) to the following questions. Use what you observed in RViz to support your answers.</p>
+    <ol>
+        <li><strong>Localization:</strong> What does AMCL do, and why did you have to set the initial pose by hand? What did the particle cloud look like right after you set the pose versus after the robot moved a little?</li>
+        <li><strong>Global vs. Local Planner:</strong> In your own words, what is the difference between the global planner and the local planner? Give one thing each of them is responsible for that the other is not.</li>
+        <li><strong>Costmaps:</strong> What is the difference between the global costmap and the local costmap? Which one detected the new obstacle you added in Step 10, and why?</li>
+        <li><strong>Recovery Behaviors:</strong> Describe a situation where the robot got stuck or hesitated. What did it do to try to recover? If it never got stuck, describe what recovery behaviors exist and when they would trigger.</li>
+    </ol>
+    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+    <h2><span style="color: #004b87;">How to Submit</span></h2>
+    <p>Take a video of your robot autonomously navigating the environment with Nav2. Your video must show both the physical robot driving on its own and the RViz navigation view at the same time.</p>
+    <p>Your video must include:</p>
+    <ul>
+        <li>The Romi stack and the Nav2 stack running without errors, with your Lab 5 map loaded in RViz.</li>
+        <li>You setting the initial pose with the <strong>2D Pose Estimate</strong> tool, and the LiDAR scan aligning to the map walls.</li>
+        <li>You sending at least <strong>two</strong> navigation goals with the <strong>Nav2 Goal</strong> tool, with the global path visible and the robot driving itself to each goal.</li>
+        <li>The <strong>dynamic obstacle avoidance</strong> test: a new obstacle placed in the robot&rsquo;s path while it navigates, and the robot reacting to it.</li>
+    </ul>
+    <p>Upload your video to <strong>YouTube only</strong>. Do not use Google Drive or other platforms.</p>
+    <p>In addition to the video, submit a single document (PDF or plain text) containing your answers to the four <strong>Write-Up Questions</strong> above and your YouTube link at the top. Name it using your name:</p>
+    <ul>
+        <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab6.pdf</code></li>
+    </ul>
+    <p>Put your YouTube link at the top of the document, like this:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">Name: Firstname Lastname
+Lab: Lab 6 - Autonomous Navigation with Nav2
+YouTube: https://youtu.be/your_link_here
+
+1. Localization: ...
+2. Global vs. Local Planner: ...
+3. Costmaps: ...
+4. Recovery Behaviors: ...</pre>
+    <p>Submit the single <code style="font-family: monospace; color: #273540;">.pdf</code> (or <code style="font-family: monospace; color: #273540;">.txt</code>) file to Canvas.</p>
+    <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> No other submission files will be accepted. You will only have two attempts to submit during the submission deadline. If a second attempt is needed, make sure all necessary changes are made before submitting, as this would be your final attempt.</blockquote>
+</div>

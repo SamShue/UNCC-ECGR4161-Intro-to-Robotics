@@ -16,7 +16,7 @@
     <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <p style="margin: 0;"><strong>Environment Note:</strong> An in-person mapping environment will be provided in the campus lab space. If you are completing this lab outside of class, find a room in your home that has clear walls and enough open floor space for the robot to drive through. A hallway, bedroom, or living room all work well. Avoid rooms with large open doorways on all sides, as the LiDAR needs walls nearby to build a useful map.</p>
     </div>
-    <p><img src="https://instructure.charlotte.edu/courses/270262/files/33545968/preview" alt="image.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33545968" data-api-returntype="File" /></p>
+    <p><img src="/courses/270262/files/33587501/preview" alt="image.png" /></p>
     <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
     <h2><span style="color: #004b87;">Background</span></h2>
     <h3>What is SLAM?</h3>
@@ -68,6 +68,34 @@
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
 ros2 launch romi_base romi_robot.launch.py</pre>
     <p>Confirm that the terminal is running without error before continuing. The LiDAR should be spinning visibly on top of the robot.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0 0 10px 0;"><strong>Side Note &mdash; Start the Robot Stack Automatically on Boot (Optional):</strong> If you use this robot often, it is convenient to have the Romi stack launch by itself when the Pi powers on, so you do not have to SSH in and start it manually every time. You can set this up with a <code style="font-family: monospace; color: #273540;">systemd</code> service. Run these commands <strong>once</strong> on the Raspberry Pi over SSH:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo tee /etc/systemd/system/romi_robot.service &gt; /dev/null &lt;&lt;'EOF'
+[Unit]
+Description=Romi robot stack (base controller + RPLidar)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=student
+ExecStart=/bin/bash -lc 'source /opt/ros/humble/setup.bash &amp;&amp; source /home/student/ros2_ws/install/setup.bash &amp;&amp; ros2 launch romi_base romi_robot.launch.py'
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable romi_robot.service
+sudo systemctl start romi_robot.service</pre>
+        <p style="margin: 10px 0 0 0;"><code style="font-family: monospace; color: #273540;">enable</code> makes the stack start on every boot, and <code style="font-family: monospace; color: #273540;">start</code> launches it now. Once this is set up, the robot stack comes up automatically on power-on and you can <strong>skip the manual <code style="font-family: monospace; color: #273540;">ros2 launch</code> command above</strong>. Useful follow-up commands:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">systemctl status romi_robot.service     # check that it is running
+journalctl -u romi_robot.service -f      # view its live log output
+sudo systemctl disable romi_robot.service  # turn off auto-start on boot</pre>
+        <p style="margin: 10px 0 0 0;"><strong>Note:</strong> The <code style="font-family: monospace; color: #273540;">ExecStart</code> line assumes your ROS 2 workspace is at <code style="font-family: monospace; color: #273540;">/home/student/ros2_ws</code>. If the <code style="font-family: monospace; color: #273540;">romi_base</code> package lives somewhere else on your image, run <code style="font-family: monospace; color: #273540;">ls ~</code> to find your workspace folder and update that path before creating the service.</p>
+    </div>
     <h3>3. Launch slam_toolbox</h3>
     <p>If you have not already installed slam_toolbox in your <strong>local WSL environment</strong>, install it now. The package is available as a prebuilt binary for ROS2 Humble:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">sudo apt update

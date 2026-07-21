@@ -29,7 +29,7 @@ POSITIONS = {
     "D": (3.6, 7.4),
     "X": (5.0, 5.9),
     "Y": (6.6, 6.3),
-    "N": (4.3, 5.0),
+    "N": (4.3, 4.0),
 }
 # Parents before any rewiring: a short stub R->A and a long branch to X.
 BASE_PARENTS = {"A": "R", "B": "R", "C": "B", "D": "C", "X": "D", "Y": "X"}

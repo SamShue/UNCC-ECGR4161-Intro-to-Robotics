@@ -154,12 +154,15 @@ def run_search() -> tuple[list[dict], list[tuple[int, int]]]:
         open_set.discard(current)
         closed_set.add(current)
 
+        step_rewired: list[tuple[tuple[int, int], tuple[int, int]]] = []
         if current != GOAL_NODE:
             for neighbor in neighbors(current):
                 if neighbor in closed_set:
                     continue
                 tentative_g = g_score[current] + edge_cost(current, neighbor)
                 if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                    if neighbor in came_from:
+                        step_rewired.append((came_from[neighbor], neighbor))
                     g_score[neighbor] = tentative_g
                     f_score[neighbor] = tentative_g + heuristic(neighbor)
                     came_from[neighbor] = current
@@ -185,6 +188,8 @@ def run_search() -> tuple[list[dict], list[tuple[int, int]]]:
                 "f_open": {node: f_score[node] for node in open_set},
                 "f_current": f_score[current],
                 "replan": is_replan,
+                "tree": dict(came_from),
+                "rewired_edges": list(step_rewired),
             }
         )
 
@@ -297,6 +302,38 @@ def highlight_node(
     )
 
 
+def draw_tree(
+    axis: plt.Axes, tree: dict[tuple[int, int], tuple[int, int]]
+) -> None:
+    """Draw all parent-child edges in the search tree as thin gray lines."""
+    for child, parent in tree.items():
+        axis.plot(
+            [parent[0], child[0]],
+            [parent[1], child[1]],
+            color="#78909C",
+            linewidth=1.5,
+            alpha=0.65,
+            zorder=2.5,
+        )
+
+
+def draw_rewired_edges(
+    axis: plt.Axes,
+    rewired_edges: list[tuple[tuple[int, int], tuple[int, int]]],
+) -> None:
+    """Draw old parent connections as dashed red lines to show rewiring."""
+    for old_parent, node in rewired_edges:
+        axis.plot(
+            [old_parent[0], node[0]],
+            [old_parent[1], node[1]],
+            color="#EF5350",
+            linewidth=2.0,
+            linestyle="--",
+            alpha=0.9,
+            zorder=3.5,
+        )
+
+
 def draw_parent_path(axis: plt.Axes, path: list[tuple[int, int]], color: str) -> None:
     """Draw the parent chain to the current node as a colored line."""
     if len(path) > 1:
@@ -371,6 +408,8 @@ def render_frame(frame: dict, file_stem: str) -> None:
     draw_grid(axis)
     draw_free_nodes(axis)
 
+    draw_tree(axis, frame["tree"])
+    draw_rewired_edges(axis, frame["rewired_edges"])
     draw_parent_path(axis, frame["path"], CURRENT_COLOR)
     highlight_node(axis, frame["current"], CURRENT_COLOR)
     highlight_node(axis, START_NODE, START_COLOR)

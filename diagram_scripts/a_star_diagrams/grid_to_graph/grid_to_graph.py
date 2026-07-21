@@ -99,8 +99,11 @@ def draw_grid(axis: plt.Axes, size: int = GRID_SIZE) -> None:
 
 
 def draw_edges(axis: plt.Axes) -> None:
-    """Draw a line for every graph edge between neighboring nodes."""
+    """Draw edges from the center node to each of its neighbors."""
+    center = (GRID_SIZE // 2, GRID_SIZE // 2)
     for node_a, node_b, _ in graph_edges():
+        if center not in (node_a, node_b):
+            continue
         axis.plot(
             [node_a[0], node_b[0]],
             [node_a[1], node_b[1]],
@@ -127,8 +130,11 @@ def draw_nodes(axis: plt.Axes) -> None:
 
 
 def draw_edge_labels(axis: plt.Axes) -> None:
-    """Label each edge with its A* cost: 10 for orthogonal, 14 for diagonal."""
+    """Label edges from the center node with A* costs: 10 for orthogonal, 14 for diagonal."""
+    center = (GRID_SIZE // 2, GRID_SIZE // 2)
     for node_a, node_b, is_diagonal in graph_edges():
+        if center not in (node_a, node_b):
+            continue
         midpoint_column = (node_a[0] + node_b[0]) / 2
         midpoint_row = (node_a[1] + node_b[1]) / 2
         cost = DIAGONAL_COST if is_diagonal else ORTHOGONAL_COST

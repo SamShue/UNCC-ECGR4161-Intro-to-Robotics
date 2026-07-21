@@ -29,7 +29,7 @@
     <p>This is called <strong>autonomous navigation</strong>, and it is exactly what the Nav2 stack is built to do.</p>
     <h3>What is Nav2?</h3>
     <p><strong>Nav2</strong> is the standard navigation framework for ROS2. It is not a single program but a collection of coordinated nodes that together turn a goal like &ldquo;drive to that corner&rdquo; into safe, real-time wheel commands. Nav2 is used on real commercial robots &mdash; warehouse robots, delivery robots, and cleaning robots all run software organized this way.</p>
-    <p>Nav2 is powerful because it separates navigation into distinct, replaceable pieces. Each piece is a specialized server with one job. The sections below describe each part of the stack you will be running. <strong>Pay attention to these &mdash; the lecture covers the theory, and you will be asked to identify these components in your write-up.</strong></p>
+    <p>Nav2 is powerful because it separates navigation into distinct, replaceable pieces. Each piece is a specialized server with one job. The sections below describe each part of the stack you will be running.</p>
     <h3>The Parts of the Navigation Stack</h3>
     <h4>1. Map Server</h4>
     <p>The <strong>Map Server</strong> loads your saved <code style="font-family: monospace; color: #273540;">.pgm</code>/<code style="font-family: monospace; color: #273540;">.yaml</code> map from Lab 5 and publishes it on the <code style="font-family: monospace; color: #273540;">/map</code> topic. This is the fixed, known map of the world. Unlike Lab 5, this map does not change as the robot drives &mdash; it is the reference the robot navigates against.</p>

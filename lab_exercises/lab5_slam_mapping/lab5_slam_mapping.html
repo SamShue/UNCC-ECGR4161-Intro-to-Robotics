@@ -16,7 +16,7 @@
     <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <p style="margin: 0;"><strong>Environment Note:</strong> An in-person mapping environment will be provided in the campus lab space. If you are completing this lab outside of class, find a room in your home that has clear walls and enough open floor space for the robot to drive through. A hallway, bedroom, or living room all work well. Avoid rooms with large open doorways on all sides, as the LiDAR needs walls nearby to build a useful map.</p>
     </div>
-    <p><img src="/courses/270262/files/33587501/preview" alt="image.png" /></p>
+    <p><img src="https://instructure.charlotte.edu/courses/270262/files/33587501/preview" alt="image.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33587501" data-api-returntype="File" /></p>
     <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
     <h2><span style="color: #004b87;">Background</span></h2>
     <h3>What is SLAM?</h3>
@@ -57,6 +57,24 @@
     <p>Both files are required to fully describe a saved map. You will submit both files as part of this lab.</p>
     <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
     <h2><span style="color: #004b87;">Procedure</span></h2>
+    <h3>Before You Begin: Get the Latest Robot Software</h3>
+    <p>The robot software is updated periodically. Before you start, download a fresh copy of the repository to your <strong>local WSL environment</strong> so you are working with the latest version. In a local WSL terminal, clone the repository into your ROS 2 workspace&rsquo;s <code style="font-family: monospace; color: #273540;">src</code> directory:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">git clone https://github.com/UNCC-Embedded-Lab/ROMI-ROS2.git ~/ros2_ws/src/ROMI-ROS2</pre>
+    <p>This downloads the current version from the repository&rsquo;s main branch. You are only grabbing a fresh copy of the files &mdash; you do not need to maintain or update this folder afterward.</p>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0 0 10px 0;"><strong>Already have a copy?</strong> If a <code style="font-family: monospace; color: #273540;">~/ros2_ws/src/ROMI-ROS2</code> folder already exists from a previous attempt, delete it first so you get a clean, up-to-date copy, then clone again:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">rm -rf ~/ros2_ws/src/ROMI-ROS2
+git clone https://github.com/UNCC-Embedded-Lab/ROMI-ROS2.git ~/ros2_ws/src/ROMI-ROS2</pre>
+    </div>
+    <p>The robot software runs on the Raspberry Pi, so after downloading your fresh copy you must push it to the Pi and rebuild it there. From the repository folder, run the sync script to copy your updated sources to the Pi:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws/src/ROMI-ROS2
+./scripts/sync_to_pi.sh</pre>
+    <p>Then SSH into the Pi and rebuild the workspace so it picks up the changes:</p>
+    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
+cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install</pre>
+    <p>When the build finishes, the Pi is running the latest software and you can continue with the lab.</p>
     <h3>1. Prepare the Robot and Connect</h3>
     <ol>
         <li>Insert charged batteries into the Romi and turn it on.</li>
@@ -68,38 +86,23 @@
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
 ros2 launch romi_base romi_robot.launch.py</pre>
     <p>Confirm that the terminal is running without error before continuing. The LiDAR should be spinning visibly on top of the robot.</p>
-    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0 0 10px 0;"><strong>Side Note &mdash; Start the Robot Stack Automatically on Boot (Optional):</strong> If you use this robot often, it is convenient to have the Romi stack launch by itself when the Pi powers on, so you do not have to SSH in and start it manually every time. You can set this up with a <code style="font-family: monospace; color: #273540;">systemd</code> service. Run these commands <strong>once</strong> on the Raspberry Pi over SSH:</p>
-        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo tee /etc/systemd/system/romi_robot.service &gt; /dev/null &lt;&lt;'EOF'
-[Unit]
-Description=Romi robot stack (base controller + RPLidar)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=student
-ExecStart=/bin/bash -lc 'source /opt/ros/humble/setup.bash &amp;&amp; source /home/student/ros2_ws/install/setup.bash &amp;&amp; ros2 launch romi_base romi_robot.launch.py'
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable romi_robot.service
-sudo systemctl start romi_robot.service</pre>
-        <p style="margin: 10px 0 0 0;"><code style="font-family: monospace; color: #273540;">enable</code> makes the stack start on every boot, and <code style="font-family: monospace; color: #273540;">start</code> launches it now. Once this is set up, the robot stack comes up automatically on power-on and you can <strong>skip the manual <code style="font-family: monospace; color: #273540;">ros2 launch</code> command above</strong>. Useful follow-up commands:</p>
-        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">systemctl status romi_robot.service     # check that it is running
-journalctl -u romi_robot.service -f      # view its live log output
-sudo systemctl disable romi_robot.service  # turn off auto-start on boot</pre>
-        <p style="margin: 10px 0 0 0;"><strong>Note:</strong> The <code style="font-family: monospace; color: #273540;">ExecStart</code> line assumes your ROS 2 workspace is at <code style="font-family: monospace; color: #273540;">/home/student/ros2_ws</code>. If the <code style="font-family: monospace; color: #273540;">romi_base</code> package lives somewhere else on your image, run <code style="font-family: monospace; color: #273540;">ls ~</code> to find your workspace folder and update that path before creating the service.</p>
-    </div>
     <h3>3. Launch slam_toolbox</h3>
     <p>If you have not already installed slam_toolbox in your <strong>local WSL environment</strong>, install it now. The package is available as a prebuilt binary for ROS2 Humble:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">sudo apt update
 sudo apt install ros-humble-slam-toolbox</pre>
+    <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
+        <p style="margin: 0 0 10px 0;"><strong>Trouble installing? &mdash; &ldquo;Unable to locate package ros-humble-slam-toolbox&rdquo;:</strong> If <code style="font-family: monospace; color: #273540;">apt</code> cannot find the package, your WSL environment is missing the ROS 2 apt repository and signing key. Add them by running the first setup steps from the official ROS 2 Humble installation guide, then update apt and retry the install. First make sure the Ubuntu Universe repository is enabled and <code style="font-family: monospace; color: #273540;">curl</code> is available:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt update &amp;&amp; sudo apt install -y software-properties-common curl
+sudo add-apt-repository universe</pre>
+        <p style="margin: 10px 0;">Next, add the ROS 2 GPG key and register the ROS 2 repository in your apt sources:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+    -o /usr/share/keyrings/ros-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release &amp;&amp; echo $UBUNTU_CODENAME) main" | \
+    sudo tee /etc/apt/sources.list.d/ros2.list &gt; /dev/null</pre>
+        <p style="margin: 10px 0 0 0;">Then refresh apt and install slam_toolbox again:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt update
+sudo apt install ros-humble-slam-toolbox</pre>
+    </div>
     <p>You only need to install slam_toolbox once. In a <strong>local WSL terminal</strong>, launch slam_toolbox in online asynchronous mode. This runs on your laptop and subscribes to the <code style="font-family: monospace; color: #273540;">/scan</code> and <code style="font-family: monospace; color: #273540;">/odom</code> topics published by the robot over the Wi-Fi network:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch slam_toolbox online_async_launch.py</pre>
     <p>After a moment, slam_toolbox will begin publishing a map. You will not see any visual output in this terminal, but you should see log messages indicating that the node has started and is processing data.</p>

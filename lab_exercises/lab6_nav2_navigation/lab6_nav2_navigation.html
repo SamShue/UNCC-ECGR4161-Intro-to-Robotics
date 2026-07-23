@@ -82,15 +82,6 @@ Meanwhile:  AMCL continuously answers "where am I in the map?" using the LiDAR.<
 git clone https://github.com/UNCC-Embedded-Lab/ROMI-ROS2.git ~/ros2_ws/src/ROMI-ROS2</pre>
     </div>
     <p>Everything this lab needs from the repository &mdash; the <code style="font-family: monospace; color: #273540;">scripts/sync_pi_clock.sh</code> script and the <code style="font-family: monospace; color: #273540;">romi_base/config/nav2_params.yaml</code> parameter file &mdash; lives in this <code style="font-family: monospace; color: #273540;">~/ros2_ws/src/ROMI-ROS2</code> folder. The commands below assume that path.</p>
-    <p>The robot software also runs on the Raspberry Pi, so after downloading your fresh copy you must push it to the Pi and rebuild it there. From the repository folder, run the sync script to copy your updated sources to the Pi:</p>
-    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws/src/ROMI-ROS2
-./scripts/sync_to_pi.sh</pre>
-    <p>Then SSH into the Pi and rebuild the workspace so it picks up the changes:</p>
-    <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ssh student@192.168.4.1
-cd ~/ros2_ws
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install</pre>
-    <p>When the build finishes, the Pi is running the latest software and you can continue with the lab.</p>
     <h3>1. Prepare the Robot and Connect</h3>
     <ol>
         <li>Insert charged batteries into the Romi and turn it on.</li>
@@ -230,15 +221,7 @@ sudo apt install ros-humble-diagnostic-updater</pre>
             </tr>
         </tbody>
     </table>
-    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
-    <h2><span style="color: #004b87;">Write-Up Questions</span></h2>
-    <p>Because the goal of this lab is to build intuition for the navigation stack, you must submit short written answers (2&ndash;4 sentences each) to the following questions. Use what you observed in RViz to support your answers.</p>
-    <ol>
-        <li><strong>Localization:</strong> What does AMCL do, and how did giving it an initial pose with the 2D Pose Estimate tool help it localize? What did the particle cloud look like right after you set the pose, and how did the LiDAR scan line up with the map&rsquo;s walls?</li>
-        <li><strong>Global vs. Local Planner:</strong> In your own words, what is the difference between the global planner and the local planner? Give one thing each of them is responsible for that the other is not.</li>
-        <li><strong>Costmaps:</strong> What is the difference between the global costmap and the local costmap? Which one detected the new obstacle you added in Step 10, and why?</li>
-        <li><strong>Recovery Behaviors:</strong> Describe a situation where the robot got stuck or hesitated. What did it do to try to recover? If it never got stuck, describe what recovery behaviors exist and when they would trigger.</li>
-    </ol>
+    <p>&nbsp;</p>
     <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
     <h2><span style="color: #004b87;">How to Submit</span></h2>
     <p>Take a video of your robot autonomously navigating the environment with Nav2. Your video must show both the physical robot driving on its own and the RViz navigation view at the same time.</p>
@@ -250,7 +233,7 @@ sudo apt install ros-humble-diagnostic-updater</pre>
         <li>The <strong>dynamic obstacle avoidance</strong> test: a new obstacle placed in the robot&rsquo;s path while it navigates, and the robot reacting to it.</li>
     </ul>
     <p>Upload your video to <strong>YouTube only</strong>. Do not use Google Drive or other platforms.</p>
-    <p>In addition to the video, submit a single document (PDF or plain text) containing your answers to the four <strong>Write-Up Questions</strong> above and your YouTube link at the top. Name it using your name:</p>
+    <p>Submit a single document (PDF or plain text) containing your&nbsp;YouTube link at the top. Name it using your name:</p>
     <ul>
         <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab6.pdf</code></li>
     </ul>
@@ -264,5 +247,4 @@ YouTube: https://youtu.be/your_link_here
 3. Costmaps: ...
 4. Recovery Behaviors: ...</pre>
     <p>Submit the single <code style="font-family: monospace; color: #273540;">.pdf</code> (or <code style="font-family: monospace; color: #273540;">.txt</code>) file to Canvas.</p>
-    <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> No other submission files will be accepted. You will only have two attempts to submit during the submission deadline. If a second attempt is needed, make sure all necessary changes are made before submitting, as this would be your final attempt.</blockquote>
 </div>

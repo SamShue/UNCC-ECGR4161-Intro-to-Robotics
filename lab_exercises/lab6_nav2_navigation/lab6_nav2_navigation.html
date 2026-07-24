@@ -89,10 +89,17 @@ git clone https://github.com/UNCC-Embedded-Lab/ROMI-ROS2.git ~/ros2_ws/src/ROMI-
         <li>Place the robot in the same environment you mapped in Lab 5, ideally near a distinctive feature like a corner or a doorway. Starting near recognizable geometry helps the robot localize itself more quickly.</li>
     </ol>
     <h3>2. Sync the Raspberry Pi Clock, Then Launch the Romi Robot Stack</h3>
-    <p>The Raspberry Pi runs on the robot&rsquo;s isolated Wi-Fi with no internet access and no battery-backed clock, so its wall clock drifts every time it boots. Nav2 and AMCL rely on message timestamps and transforms being closely aligned across the Pi and your laptop &mdash; a skewed Pi clock causes &ldquo;message filter dropping message&rdquo; and &ldquo;transform data too old&rdquo; errors that make localization and navigation misbehave. Before launching the robot stack, run the provided sync script from your <strong>local WSL environment</strong> to push your laptop&rsquo;s time onto the Pi over SSH:</p>
+    <p>The Raspberry Pi runs on the robot&rsquo;s isolated Wi-Fi with no internet access and no battery-backed clock, so its wall clock drifts every time it boots. Nav2 and AMCL rely on message timestamps and transforms being closely aligned across the Pi and your laptop &mdash; a skewed Pi clock causes &ldquo;message filter dropping message&rdquo; and &ldquo;transform data too old&rdquo; errors that make localization and navigation misbehave. Before launching the robot stack, you will run the provided sync script from your <strong>local WSL environment</strong> to push your laptop&rsquo;s time onto the Pi over SSH.</p>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0 0 10px 0;"><strong>One-time setup (run once per Pi):</strong> The very first time you use this script, run it once with the <code style="font-family: monospace; color: #273540;">--install-sudoers</code> flag. Setting the clock requires <code style="font-family: monospace; color: #273540;">sudo</code> on the Pi, and the delay of typing the sudo password skews the very clock offset you are trying to correct. This one-time step installs a small, clock-command-scoped passwordless-sudo rule on the Pi so later syncs run instantly and accurately:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">cd ~/ros2_ws/src/ROMI-ROS2
+./scripts/sync_pi_clock.sh --install-sudoers</pre>
+        <p style="margin: 10px 0 0 0;">You only need to do this once per Pi. During this one-time setup you may be prompted for the SSH and sudo password.</p>
+    </div>
+    <p>After that one-time setup, sync the clock by running the script <strong>without</strong> any flags:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">cd ~/ros2_ws/src/ROMI-ROS2
 ./scripts/sync_pi_clock.sh</pre>
-    <p>The script SSHes into the Pi (default user <code style="font-family: monospace; color: #273540;">student</code>, host <code style="font-family: monospace; color: #273540;">192.168.4.1</code>), sets its clock to match your laptop, and verifies the offset is small. You may be prompted for the SSH and/or sudo password.</p>
+    <p>The script SSHes into the Pi (default user <code style="font-family: monospace; color: #273540;">student</code>, host <code style="font-family: monospace; color: #273540;">192.168.4.1</code>), sets its clock to match your laptop, and verifies the offset is small. Because you installed the passwordless-sudo rule above, it no longer prompts for the sudo password (you may still be asked for the SSH password).</p>
     <div style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;">
         <p style="margin: 0;"><strong>Do this every time.</strong> Run <code style="font-family: monospace; color: #273540;">sync_pi_clock.sh</code> <em>before</em> launching the robot stack every session (and again if the Pi has been powered on for a long time), so the control loop and Nav2 start with a corrected clock. This uses the copy of the repository you cloned in <em>Before You Begin</em>.</p>
     </div>
@@ -136,6 +143,12 @@ sudo apt install ros-humble-diagnostic-updater</pre>
     <h3>6. Launch the Nav2 RViz View</h3>
     <p>In a <strong>local WSL terminal (Terminal 3)</strong>, launch the preconfigured Nav2 RViz view. This RViz configuration already has all the navigation displays and the special goal tools set up for you:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch nav2_bringup rviz_launch.py</pre>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0 0 10px 0;"><strong>Side Note &mdash; RViz won&rsquo;t render?</strong> In WSL, RViz sometimes opens as a black or blank window, fails to draw, or crashes on startup because of OpenGL/GPU limitations. If that happens, force RViz to use software rendering by setting this environment variable in the same terminal before launching it:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">export LIBGL_ALWAYS_SOFTWARE=1
+ros2 launch nav2_bringup rviz_launch.py</pre>
+        <p style="margin: 10px 0 0 0;">The variable only affects the terminal you set it in, so run it in each terminal where you start RViz. To make it permanent, add <code style="font-family: monospace; color: #273540;">export LIBGL_ALWAYS_SOFTWARE=1</code> to the end of your <code style="font-family: monospace; color: #273540;">~/.bashrc</code>.</p>
+    </div>
     <p>You should see your Lab 5 map appear as a black-and-white occupancy grid. If the map does not appear, confirm that the fixed frame at the top of the Displays panel is set to <code style="font-family: monospace; color: #273540;">map</code> and that localization launched without error.</p>
     <p>Take a moment to locate these tools in the RViz toolbar at the top of the window:</p>
     <ul>

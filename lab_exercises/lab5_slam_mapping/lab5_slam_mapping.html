@@ -120,6 +120,12 @@ sudo apt install ros-humble-slam-toolbox</pre>
     <h3>4. Configure RViz</h3>
     <p>In <strong>Terminal 3</strong> on your <strong>local WSL environment</strong>, launch RViz:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">rviz2</pre>
+    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0 0 10px 0;"><strong>Side Note &mdash; RViz won&rsquo;t render?</strong> In WSL, RViz sometimes opens as a black or blank window, fails to draw, or crashes on startup because of OpenGL/GPU limitations. If that happens, force RViz to use software rendering by setting this environment variable in the same terminal before launching it:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">export LIBGL_ALWAYS_SOFTWARE=1
+rviz2</pre>
+        <p style="margin: 10px 0 0 0;">The variable only affects the terminal you set it in, so run it in each terminal where you start RViz. To make it permanent, add <code style="font-family: monospace; color: #273540;">export LIBGL_ALWAYS_SOFTWARE=1</code> to the end of your <code style="font-family: monospace; color: #273540;">~/.bashrc</code>.</p>
+    </div>
     <p>Configure RViz to visualize the mapping process:</p>
     <ol>
         <li>In the <strong>Global Options</strong> section at the top of the Displays panel, set the <strong>Fixed Frame</strong> to <code style="font-family: monospace; color: #273540;">map</code>. If this field turns red, the <code style="font-family: monospace; color: #273540;">map</code> frame is not yet available &mdash; slam_toolbox is not running or has not received a scan yet.</li>

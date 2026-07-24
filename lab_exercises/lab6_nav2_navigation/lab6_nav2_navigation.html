@@ -143,12 +143,6 @@ sudo apt install ros-humble-diagnostic-updater</pre>
     <h3>6. Launch the Nav2 RViz View</h3>
     <p>In a <strong>local WSL terminal (Terminal 3)</strong>, launch the preconfigured Nav2 RViz view. This RViz configuration already has all the navigation displays and the special goal tools set up for you:</p>
     <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin-top: 10px;">ros2 launch nav2_bringup rviz_launch.py</pre>
-    <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0 0 10px 0;"><strong>Side Note &mdash; RViz won&rsquo;t render?</strong> In WSL, RViz sometimes opens as a black or blank window, fails to draw, or crashes on startup because of OpenGL/GPU limitations. If that happens, force RViz to use software rendering by setting this environment variable in the same terminal before launching it:</p>
-        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">export LIBGL_ALWAYS_SOFTWARE=1
-ros2 launch nav2_bringup rviz_launch.py</pre>
-        <p style="margin: 10px 0 0 0;">The variable only affects the terminal you set it in, so run it in each terminal where you start RViz. To make it permanent, add <code style="font-family: monospace; color: #273540;">export LIBGL_ALWAYS_SOFTWARE=1</code> to the end of your <code style="font-family: monospace; color: #273540;">~/.bashrc</code>.</p>
-    </div>
     <p>You should see your Lab 5 map appear as a black-and-white occupancy grid. If the map does not appear, confirm that the fixed frame at the top of the Displays panel is set to <code style="font-family: monospace; color: #273540;">map</code> and that localization launched without error.</p>
     <p>Take a moment to locate these tools in the RViz toolbar at the top of the window:</p>
     <ul>

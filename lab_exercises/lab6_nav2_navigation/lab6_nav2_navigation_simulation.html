@@ -220,16 +220,6 @@ ros2 launch nav2_bringup rviz_launch.py</pre>
         </tbody>
     </table>
     <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
-    <h2><span style="color: #004b87;">Write-Up Questions</span></h2>
-    <p>Because the goal of this lab is to build intuition for the navigation stack, you must submit short written answers (2&ndash;4 sentences each) to the following questions. Use what you observed in RViz and Gazebo to support your answers.</p>
-    <ol>
-        <li><strong>Localization:</strong> What does AMCL do, and why was the robot able to localize immediately in this simulation without you setting a pose by hand? What did the particle cloud look like, and how did the LiDAR scan line up with the map&rsquo;s walls?</li>
-        <li><strong>Global vs. Local Planner:</strong> In your own words, what is the difference between the global planner and the local planner? Give one thing each of them is responsible for that the other is not.</li>
-        <li><strong>Costmaps:</strong> What is the difference between the global costmap and the local costmap? Which one detected the new obstacle you dropped into Gazebo in Step 8, and why?</li>
-        <li><strong>Recovery Behaviors:</strong> Describe a situation where the robot got stuck or hesitated. What did it do to try to recover? If it never got stuck, describe what recovery behaviors exist and when they would trigger.</li>
-        <li><strong>Simulation vs. Hardware:</strong> Because Nav2 cannot tell a simulated robot from a real one, what did running this in Gazebo let you do that would have been harder, slower, or riskier on the physical Romi?</li>
-    </ol>
-    <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
     <h2><span style="color: #004b87;">How to Submit</span></h2>
     <p>Take a <strong>screen recording</strong> of your simulated robot autonomously navigating the office world with Nav2. Your recording must show both the Gazebo window (the robot driving) and the RViz navigation view at the same time.</p>
     <p>Your recording must include:</p>
@@ -240,7 +230,7 @@ ros2 launch nav2_bringup rviz_launch.py</pre>
         <li>The <strong>dynamic obstacle avoidance</strong> test: a new shape dropped into the robot&rsquo;s path in Gazebo while it navigates, and the robot reacting to it.</li>
     </ul>
     <p>Upload your video to <strong>YouTube only</strong>. Do not use Google Drive or other platforms.</p>
-    <p>In addition to the video, submit a single document (PDF or plain text) containing your answers to the five <strong>Write-Up Questions</strong> above and your YouTube link at the top. Name it using your name:</p>
+    <p>Submit a single document (PDF or plain text) containing your&nbsp;YouTube link at the top. Name it using your name:</p>
     <ul>
         <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab6_sim.pdf</code></li>
     </ul>

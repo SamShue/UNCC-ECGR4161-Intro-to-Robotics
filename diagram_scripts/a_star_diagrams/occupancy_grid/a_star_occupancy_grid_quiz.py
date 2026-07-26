@@ -12,6 +12,7 @@ Two PNGs are written next to this script:
 """
 
 import heapq
+import random
 from math import hypot
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from matplotlib.patches import Rectangle
 GRID_SIZE = 8
 
 # Coordinates use the form (column, row), with (0, 0) at the lower-left.
+# They are randomized in main() for each run.
 START_NODE = (1, 1)
 GOAL_NODE = (6, 6)
 
@@ -32,15 +34,8 @@ ORTHOGONAL_COST = 10
 DIAGONAL_COST = 14
 CELL_UNITS = 10
 
-# Two L-shaped obstacles in the grid.
-OBSTACLE_CELLS = frozenset(
-    {
-        # Lower L-shape.
-        (2, 2), (3, 2), (4, 2), (2, 3), (2, 4),
-        # Upper L-shape.
-        (3, 5), (4, 5), (5, 5), (5, 4), (5, 3),
-    }
-)
+# Two L-shaped obstacles in the grid. They are randomized in main().
+OBSTACLE_CELLS = frozenset()
 
 # Output files are written next to this script.
 OUTPUT_DIRECTORY = Path(__file__).resolve().parent
@@ -66,6 +61,85 @@ def is_free(node: tuple[int, int]) -> bool:
     column, row = node
     in_bounds = 0 <= column < GRID_SIZE and 0 <= row < GRID_SIZE
     return in_bounds and node not in OBSTACLE_CELLS
+
+
+def make_l_shape(
+    corner: tuple[int, int],
+    step_x: int,
+    step_y: int,
+    length_x: int,
+    length_y: int,
+) -> set[tuple[int, int]]:
+    """Return one L-shaped obstacle as a set of occupied cells."""
+    corner_x, corner_y = corner
+    cells = {(corner_x, corner_y)}
+    for offset in range(1, length_x):
+        cells.add((corner_x + step_x * offset, corner_y))
+    for offset in range(1, length_y):
+        cells.add((corner_x, corner_y + step_y * offset))
+    return cells
+
+
+def in_bounds(cells: set[tuple[int, int]]) -> bool:
+    """Return True if all obstacle cells lie inside the grid."""
+    return all(0 <= column < GRID_SIZE and 0 <= row < GRID_SIZE for column, row in cells)
+
+
+def generate_random_configuration() -> tuple[tuple[int, int], tuple[int, int], frozenset[tuple[int, int]]]:
+    """Return randomized start/goal and two non-overlapping L-shaped obstacles."""
+    rng = random.Random()
+    all_cells = [(column, row) for column in range(GRID_SIZE) for row in range(GRID_SIZE)]
+
+    for _ in range(600):
+        l_shapes: list[set[tuple[int, int]]] = []
+        occupied: set[tuple[int, int]] = set()
+
+        for _shape_index in range(2):
+            built_shape = None
+            for _shape_try in range(150):
+                corner = (
+                    rng.randrange(1, GRID_SIZE - 1),
+                    rng.randrange(1, GRID_SIZE - 1),
+                )
+                step_x = rng.choice((-1, 1))
+                step_y = rng.choice((-1, 1))
+                length_x = rng.randint(3, 4)
+                length_y = rng.randint(3, 4)
+
+                candidate = make_l_shape(corner, step_x, step_y, length_x, length_y)
+                if not in_bounds(candidate):
+                    continue
+                if candidate & occupied:
+                    continue
+                built_shape = candidate
+                break
+
+            if built_shape is None:
+                break
+
+            l_shapes.append(built_shape)
+            occupied |= built_shape
+
+        if len(l_shapes) != 2:
+            continue
+
+        free_cells = [cell for cell in all_cells if cell not in occupied]
+        if len(free_cells) < 12:
+            continue
+
+        start = rng.choice(free_cells)
+        far_cells = [
+            cell
+            for cell in free_cells
+            if cell != start and abs(cell[0] - start[0]) + abs(cell[1] - start[1]) >= 6
+        ]
+        if not far_cells:
+            continue
+        goal = rng.choice(far_cells)
+
+        return start, goal, frozenset(occupied)
+
+    raise RuntimeError("Could not generate a valid random occupancy-grid configuration.")
 
 
 def neighbors(node: tuple[int, int]) -> list[tuple[int, int]]:
@@ -193,6 +267,8 @@ def choose_options(frame: dict) -> list[tuple[int, int]]:
         frame["open"],
         key=lambda node: (frame["f"][node], node[1], node[0]),
     )
+    if len(ranked_open_nodes) < 4:
+        return []
     return ranked_open_nodes[:4]
 
 
@@ -200,6 +276,9 @@ def option_labels(
     frame: dict, options: list[tuple[int, int]]
 ) -> tuple[dict[tuple[int, int], str], str]:
     """Assign visible labels to the options and return the correct label."""
+    if len(options) != 4:
+        raise ValueError("Exactly four options are required for labels A-D.")
+
     displayed_order = sorted(options, key=lambda node: (node[1], node[0]))
     label_names = ["A", "B", "C", "D"]
     label_map = {node: label for node, label in zip(displayed_order, label_names)}
@@ -474,9 +553,29 @@ def render_answer(frame: dict, option_map: dict[tuple[int, int], str], correct_l
 
 def main() -> None:
     """Build the quiz images."""
-    frames = run_search()
-    quiz_frame = select_quiz_frame(frames)
-    options = choose_options(quiz_frame)
+    global START_NODE, GOAL_NODE, OBSTACLE_CELLS
+
+    quiz_frame = None
+    options: list[tuple[int, int]] = []
+
+    for _ in range(300):
+        START_NODE, GOAL_NODE, OBSTACLE_CELLS = generate_random_configuration()
+        frames = run_search()
+        if not frames or frames[-1]["current"] != GOAL_NODE:
+            continue
+
+        candidate_frame = select_quiz_frame(frames)
+        candidate_options = choose_options(candidate_frame)
+        if len(candidate_options) != 4:
+            continue
+
+        quiz_frame = candidate_frame
+        options = candidate_options
+        break
+
+    if quiz_frame is None:
+        raise RuntimeError("Could not produce a quiz-ready random configuration.")
+
     option_map, correct_label = option_labels(quiz_frame, options)
 
     render_question(quiz_frame, option_map)

@@ -1,0 +1,259 @@
+<div id="dp-wrapper" class="dp-wrapper">
+    <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
+        <h2><span style="color: #004b87;">Objective</span></h2>
+        <p>In this MATLAB-based Lab 1, you will set up the full ROMI toolchain and validate end-to-end communication using ROS 2 topics.</p>
+        <p>The setup process is the same as the standard Lab 1 for robot bring-up (Arduino, Pi image, WSL2, ROS 2, VS Code, sync script). The core difference is that your laptop-side logic test will publish from MATLAB (ROS Toolbox) instead of a Python node.</p>
+        <div style="text-align: center; margin: 20px 0;"><img id="33191322" style="max-width: 100%; height: auto; border-radius: 6px; padding: 10px; background-color: #ffffff; border: 1px solid #dddddd;" src="https://instructure.charlotte.edu/courses/270262/files/33191322/preview" alt="sysArch.png" width="669" height="473" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33191322" data-api-returntype="File" /></div>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Required Materials</span></h2>
+        <ul>
+            <li>Romi32U4 Control Board (included in the Romi kit)</li>
+            <li>Micro USB cable</li>
+            <li>Laptop (Windows preferred)</li>
+            <li>Raspberry Pi 4B</li>
+            <li>&ge; 32GB MicroSD card (+ adapter if needed)</li>
+            <li>6x AA batteries</li>
+            <li>MATLAB with ROS Toolbox</li>
+        </ul>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Background</span></h2>
+        <h3>System Architecture</h3>
+        <ul>
+            <li><strong>Raspberry Pi 4B:</strong> high-level ROS 2 runtime and hardware bridge process.</li>
+            <li><strong>Romi 32U4:</strong> low-level motor and sensor interface over I2C.</li>
+            <li><strong>Laptop:</strong> development workstation and command publisher.</li>
+        </ul>
+        <p>ROS 2 enables these devices to communicate via topics. In this MATLAB version of the lab, your laptop publishes command topics using ROS Toolbox.</p>
+        <h3>Topics Used in This Lab</h3>
+        <ul>
+            <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/leds</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">std_msgs/Int16MultiArray</code>, data = <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">[red, yellow, green]</code>.</li>
+            <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/wheel_pwm</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">std_msgs/Int16MultiArray</code>, data = <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">[left_pwm, right_pwm]</code>.</li>
+        </ul>
+
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;"><strong>Important:</strong> During validation, use conservative PWM magnitudes (for example, +/-80 to +/-120), and always send a final stop command <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">[0, 0]</code>.</p>
+        </div>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Procedure</span></h2>
+        <p>To fully set up the robot and toolchain, follow all steps below:</p>
+        <ol>
+            <li>Assemble the robot (if using a personal kit)</li>
+            <li>Install and configure Arduino IDE for the Romi32U4</li>
+            <li>Prepare the Raspberry Pi image</li>
+            <li>Install ROS 2 in WSL2</li>
+            <li>Install MATLAB and ROS Toolbox</li>
+            <li>Install/configure VS Code and sync workflow</li>
+            <li>Validate end-to-end operation with MATLAB publishing</li>
+        </ol>
+
+        <h3>Step 1.0: Assemble the Robot</h3>
+        <p><strong>IMPORTANT:</strong> This step is only required for students using their own Romi kit. If using a provided lab robot, proceed to Step 1.1.</p>
+        <p>If needed, use the ROMI assembly guide from the course materials before continuing.</p>
+
+        <h3>Step 1.1: Install Arduino IDE</h3>
+        <ul>
+            <li>Download Arduino IDE from <a class="inline_disabled" style="color: #004b87;" href="https://www.arduino.cc/en/software/" target="_blank" rel="noopener">Arduino's website</a>.</li>
+            <li>Install the version for your operating system.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200901/preview" alt="arduinoDownload.png" width="808" height="398" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200901" data-api-returntype="File" /></li>
+        </ul>
+
+        <h3>Step 1.2: Configure Arduino IDE for Romi32U4</h3>
+        <h4>Install Windows Drivers</h4>
+        <ol>
+            <li>Download and extract the <a class="inline_disabled" style="color: #004b87;" href="https://www.pololu.com/file/0J1240/a-star-windows-1.3.0.0.zip" target="_blank" rel="noopener">A-Star Windows Drivers</a>.</li>
+            <li>Right-click <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">a-star.inf</code> and click Install.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200903/preview" alt="astarDriverInstall.png" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200903" data-api-returntype="File" /></li>
+        </ol>
+        <h4>Add Pololu A-Star Board Support</h4>
+        <ol>
+            <li>Open Arduino IDE and go to File &gt; Preferences &gt; Settings.</li>
+            <li>Add this URL in Additional boards manager URLs:</li>
+        </ol>
+        <p><code style="background-color: #f4f4f4; padding: 4px 8px; border-radius: 4px; color: #273540; font-family: monospace; display: inline-block; margin-top: 5px;">https://files.pololu.com/arduino/package_pololu_index.json</code><br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200904/preview" alt="boardsURL.png" width="590" height="371" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200904" data-api-returntype="File" /></p>
+        <ol start="3">
+            <li>Install Pololu A-Star Boards in Boards Manager.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200905/preview" alt="boardsManager.png" width="592" height="297" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200905" data-api-returntype="File" /></li>
+            <li>Select Pololu A-Star 32U4 as your board.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200906/preview" alt="selectBoard.png" width="617" height="443" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200906" data-api-returntype="File" /></li>
+        </ol>
+        <h4>Install Romi32U4 Library</h4>
+        <ol>
+            <li>Go to Sketch &gt; Include Library &gt; Manage Libraries.</li>
+            <li>Search and install <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">Romi32U4</code>.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200907/preview" alt="romiLibrary.png" width="582" height="284" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200907" data-api-returntype="File" /></li>
+        </ol>
+
+        <h3>Step 1.3: Program the Romi</h3>
+        <p>Flash <a id="33207353" class="instructure_file_link inline_disabled" style="color: #004b87;" href="https://instructure.charlotte.edu/courses/270262/files/33207353?wrap=1" target="_blank" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33207353" data-api-returntype="File" rel="noopener">RomiRPiSlaveDemo.ino</a> to the Romi board.<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200908/preview" alt="uploadSketch.png" width="582" height="612" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200908" data-api-returntype="File" /></p>
+
+        <h3>Step 2: Raspberry Pi Setup</h3>
+        <ol>
+            <li>Download the class Pi image: <a class="instructure_file_link inline_disabled" style="color: #004b87;" title="romiPi20260528.img.xz" href="https://instructure.charlotte.edu/courses/270262/files/33245485?wrap=1" target="_blank" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33245485" data-api-returntype="File" rel="noopener">Class Pi Image</a>.</li>
+            <li>Install <a class="inline_disabled" style="color: #004b87;" href="https://www.raspberrypi.com/software/" target="_blank" rel="noopener">Raspberry Pi Imager</a>.</li>
+            <li>Flash the image to your SD card (Raspberry Pi 4, Use Custom, then select SD card).</li>
+        </ol>
+
+        <h3>Step 3: ROS 2 in WSL2</h3>
+        <ol>
+            <li>Open PowerShell as administrator.</li>
+            <li>Run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">wsl --install</code></li>
+            <li>Run <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #c71f23; font-family: monospace;">wsl --install -d Ubuntu-22.04</code></li>
+            <li>Install ROS 2 Humble Desktop + development tools by following the official docs.</li>
+        </ol>
+        <p>Add ROS setup to your bashrc:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">echo "source /opt/ros/humble/setup.bash" &gt;&gt; ~/.bashrc</pre>
+        <p>Set WSL networking mode to Mirrored and allow Hyper-V inbound traffic:<br /><img style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33200910/preview" alt="wslSettings.jpg" width="930" height="243" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33200910" data-api-returntype="File" /></p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">Set-NetFirewallHyperVVMSetting -Name '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -DefaultInboundAction Allow</pre>
+
+        <p>Clone the class repository in WSL:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">cd ~
+mkdir -p ros2_ws/src
+cd ros2_ws/src
+git clone -b lab1 https://github.com/UNCC-Embedded-Lab/ROMI-ROS2.git</pre>
+
+        <h3>Step 4: Install MATLAB and ROS Toolbox</h3>
+        <ol>
+            <li>Install MATLAB through your university MathWorks portal.</li>
+            <li>Sign in with your <strong>charlotte.edu</strong> credentials when MATLAB launches.</li>
+            <li>In Add-On Explorer, install or verify <strong>ROS Toolbox</strong>.</li>
+            <li>Optional check in MATLAB Command Window: <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">ver</code></li>
+        </ol>
+
+        <h3>Step 5: Install and Configure VS Code</h3>
+        <ol>
+            <li>Install <a class="inline_disabled" style="color: #004b87;" href="https://code.visualstudio.com/download" target="_blank" rel="noopener">VS Code</a>.</li>
+            <li>Install the WSL extension.</li>
+            <li>Connect to WSL using Ubuntu and open your Linux home directory.</li>
+        </ol>
+
+        <h3>Step 6: Build and Sync Workspace to Pi</h3>
+        <p>In WSL:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">cd ~/ros2_ws
+colcon build --symlink-install
+source ~/ros2_ws/install/setup.bash</pre>
+        <p>Sync code to the Pi:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">cd ~/ros2_ws/src/ROMI-ROS2
+./scripts/sync_to_pi.sh</pre>
+        <p>On the Pi, confirm package installation:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ros2 pkg prefix romi_base</pre>
+
+        <h3>Step 7: End-to-End MATLAB Validation</h3>
+        <h4>Hardware Assembly and Power</h4>
+        <ul>
+            <li>Mount Raspberry Pi on the Romi header in the correct orientation.</li>
+            <li>Install 6 AA batteries and power the robot from the battery pack.</li>
+            <li>Wait for boot. Join Wi-Fi AP <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">Romi-XXXX</code> (password: <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi32u4</code>).</li>
+        </ul>
+
+        <h4>Start the Bridge Node on the Pi</h4>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ssh student@192.168.4.1
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+export ROS_DOMAIN_ID=0
+ros2 run romi_base astar_bridge</pre>
+
+        <h4>Create and Run MATLAB Publisher Script</h4>
+        <p>Create <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi_matlab_setup_test.m</code>:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">% romi_matlab_setup_test.m
+% MATLAB ROS 2 publisher test for ROMI Lab 1
+
+clear;
+clc;
+
+% Must match ROS_DOMAIN_ID used on the Pi terminal.
+setenv('ROS_DOMAIN_ID', '0');
+
+% Create ROS 2 node and publishers.
+node = ros2node('/matlab_setup_test_node');
+ledPub = ros2publisher(node, '/leds', 'std_msgs/Int16MultiArray');
+pwmPub = ros2publisher(node, '/wheel_pwm', 'std_msgs/Int16MultiArray');
+
+% Create messages.
+ledMsg = ros2message(ledPub);
+pwmMsg = ros2message(pwmPub);
+
+% Helper function call wrapper.
+sendCmd = @(ledArray, pwmArray, pauseSec) localSend(ledPub, ledMsg, ledArray, pwmPub, pwmMsg, pwmArray, pauseSec);
+
+disp('Starting MATLAB ROMI setup test...');
+
+% GREEN + stop
+sendCmd([0, 0, 1], [0, 0], 1.5);
+
+% YELLOW + forward
+sendCmd([0, 1, 0], [80, 80], 2.0);
+
+% GREEN + stop
+sendCmd([0, 0, 1], [0, 0], 1.5);
+
+% RED + reverse
+sendCmd([1, 0, 0], [-80, -80], 2.0);
+
+% GREEN + final stop
+sendCmd([0, 0, 1], [0, 0], 1.5);
+
+disp('Test complete.');
+
+function localSend(ledPub, ledMsg, ledArray, pwmPub, pwmMsg, pwmArray, pauseSec)
+    ledMsg.data = int16(ledArray);
+    pwmMsg.data = int16(pwmArray);
+
+    send(ledPub, ledMsg);
+    send(pwmPub, pwmMsg);
+
+    pause(pauseSec);
+end</pre>
+
+        <p>Run in MATLAB Command Window:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">romi_matlab_setup_test</pre>
+
+        <h4>Optional Topic Checks</h4>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ros2 topic list
+ros2 topic echo /leds
+ros2 topic echo /wheel_pwm</pre>
+
+        <h4>Observe the Output</h4>
+        <p>The Romi LEDs should match the commanded sequence and the wheels should move forward, stop, reverse, and stop. This confirms your end-to-end communication path from laptop MATLAB publisher to ROS 2 topic transport to Pi bridge to low-level I2C hardware control.</p>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+            <thead>
+                <tr style="background-color: #004b87; color: white;">
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Expected Observation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Toolchain Bring-up</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">Arduino setup, Pi image boot, ROS 2 workspace build, and sync script execution complete without blocking errors.</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>MATLAB Login and Toolbox</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">MATLAB is activated via <strong>charlotte.edu</strong> credentials and ROS Toolbox is available.</td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>MATLAB Topic Publish Test</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">Robot responds to <code style="font-family: monospace; color: #273540;">/leds</code> and <code style="font-family: monospace; color: #273540;">/wheel_pwm</code> commands published by MATLAB.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">How to Submit</span></h2>
+        <p>Take a short video demonstrating all verification tasks, including MATLAB running your script and the robot response.</p>
+        <p>Upload your video to <strong>YouTube only</strong> and include the link in your submission file. Example format:<br /><img id="33208743" style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33208743/preview" alt="exampleHeader.jpg" width="736" height="356" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33208743" data-api-returntype="File" /></p>
+        <p>Submit a text file named <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab1_matlab.txt</code> containing:</p>
+        <ul>
+            <li>Your name</li>
+            <li>YouTube link</li>
+            <li>Your MATLAB script code</li>
+        </ul>
+
+        <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> Safety first. Test initially with wheels off the floor, then proceed to on-floor operation once behavior is confirmed.</blockquote>
+    </div>
+</div>

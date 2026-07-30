@@ -1,0 +1,212 @@
+<div id="dp-wrapper" class="dp-wrapper">
+    <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
+        <h2><span style="color: #004b87;">Lab 2: MATLAB Velocity Control</span></h2>
+        <p>In this lab, you will bridge the gap between high-level motion commands and low-level hardware actuation using MATLAB and ROS Toolbox. Instead of implementing the controller inside the <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi_base</code> Python package, you will run the <strong>astar_bridge</strong> node on the Raspberry Pi and implement a PI controller in MATLAB that publishes wheel PWM commands while subscribing to encoder feedback from the bridge.</p>
+        <p>The goal is to learn the control loop itself: measure wheel speed from encoders, compare it to a target speed, tune <em>K<sub>p</sub></em> and <em>K<sub>i</sub></em>, and send updated PWM values until the robot tracks the desired motion.</p>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Required Materials</span></h2>
+        <ul>
+            <li>Romi32U4 robot with Raspberry Pi 4B</li>
+            <li>Raspberry Pi image prepared from Lab 1</li>
+            <li>Windows laptop with MATLAB installed</li>
+            <li>ROS Toolbox installed in MATLAB</li>
+            <li>WSL2 with ROS 2 Humble installed</li>
+            <li>6x AA batteries</li>
+        </ul>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Background</span></h2>
+        <h3>What Changes in This MATLAB Version</h3>
+        <ul>
+            <li>You do <strong>not</strong> modify the ROS 2 controller node in <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi_base</code>.</li>
+            <li>You run only the Pi-side bridge node: <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">astar_bridge</code>.</li>
+            <li>Your MATLAB script publishes to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/wheel_pwm</code> and subscribes to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/encoder_ticks</code>.</li>
+            <li>If you choose to display status, you may also publish to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/leds</code>.</li>
+        </ul>
+
+        <h3>Topics Provided by the Bridge</h3>
+        <ul>
+            <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/encoder_ticks</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">std_msgs/Int32MultiArray</code> containing left and right encoder counts.</li>
+            <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/wheel_pwm</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">std_msgs/Int16MultiArray</code> containing left and right PWM values.</li>
+            <li><code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/leds</code> with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">std_msgs/Int16MultiArray</code> containing red, yellow, and green LED values.</li>
+        </ul>
+
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;"><strong>Important:</strong> This lab focuses on controller tuning in MATLAB. Keep the robot elevated for the first tests, start with low PWM magnitudes, and always send a final stop command <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">[0, 0]</code> before ending your session.</p>
+        </div>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Procedure</span></h2>
+
+        <h3>1. Prepare the Robot and Pi</h3>
+        <ol>
+            <li>Use the Lab 1 golden image workflow so the Raspberry Pi is already configured with Ubuntu, ROS 2, and the ROMI bridge support.</li>
+            <li>Mount the Pi on the Romi, insert batteries, and connect to the robot&rsquo;s Wi-Fi network.</li>
+            <li>SSH into the Pi and start the bridge node:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ssh student@192.168.4.1
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+export ROS_DOMAIN_ID=0
+ros2 run romi_base astar_bridge</pre>
+
+        <h3>2. Open MATLAB and Create Your Controller Script</h3>
+        <p>Install and launch MATLAB, sign in with your <strong>charlotte.edu</strong> credentials, and verify that <strong>ROS Toolbox</strong> is installed. Then create a MATLAB script named <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi_lab2_pi_controller.m</code>.</p>
+
+        <h3>3. Understand the Control Loop</h3>
+        <p>Your MATLAB script should perform the following loop:</p>
+        <ol>
+            <li>Read encoder counts from <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/encoder_ticks</code>.</li>
+            <li>Convert encoder counts into measured wheel speed.</li>
+            <li>Compare measured speed to your target wheel speed.</li>
+            <li>Compute PWM using a PI controller.</li>
+            <li>Publish the updated PWM to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/wheel_pwm</code>.</li>
+            <li>Repeat at a fixed control interval.</li>
+        </ol>
+
+        <h3>4. MATLAB Starter Script</h3>
+        <p>Use the script below as your starting point. It provides the ROS 2 publishers and subscribers you need, along with a PI controller scaffold. Your job is to tune the gains and verify stable tracking.</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">% romi_lab2_pi_controller.m
+% MATLAB PI controller for ROMI Lab 2
+
+clear;
+clc;
+
+setenv('ROS_DOMAIN_ID', '0');
+
+node = ros2node('/romi_lab2_pi_controller');
+encSub = ros2subscriber(node, '/encoder_ticks', 'std_msgs/Int32MultiArray');
+pwmPub = ros2publisher(node, '/wheel_pwm', 'std_msgs/Int16MultiArray');
+ledPub = ros2publisher(node, '/leds', 'std_msgs/Int16MultiArray');
+
+pwmMsg = ros2message(pwmPub);
+ledMsg = ros2message(ledPub);
+
+% Controller targets
+leftTargetMps = 0.10;
+rightTargetMps = 0.10;
+
+% Tuning parameters
+kp = 450.0;
+ki = 120.0;
+maxPwm = 300;
+
+% Robot constants (adjust only if your course provides updated values)
+wheelDiameterM = 0.07;
+ticksPerRev = 1440.0;
+wheelCircumferenceM = pi * wheelDiameterM;
+
+% State
+integralLeft = 0.0;
+integralRight = 0.0;
+prevTicks = [];
+prevTime = tic;
+
+% Warm-up indication
+ledMsg.data = int16([0, 1, 0]);
+send(ledPub, ledMsg);
+
+fprintf('Starting ROMI PI control loop...\n');
+
+while true
+    if encSub.NumMessagesAvailable == 0
+        pause(0.01);
+        continue;
+    end
+
+    encMsg = receive(encSub, 1.0);
+    currentTicks = double(encMsg.data(:));
+
+    if numel(currentTicks) < 2
+        warning('Expected two encoder values [left, right].');
+        continue;
+    end
+
+    dt = toc(prevTime);
+    prevTime = tic;
+    if dt <= 0
+        dt = 1e-3;
+    end
+
+    if isempty(prevTicks)
+        prevTicks = currentTicks;
+        continue;
+    end
+
+    deltaTicks = currentTicks - prevTicks;
+    prevTicks = currentTicks;
+
+    leftDistanceM = (deltaTicks(1) / ticksPerRev) * wheelCircumferenceM;
+    rightDistanceM = (deltaTicks(2) / ticksPerRev) * wheelCircumferenceM;
+
+    leftSpeedMps = leftDistanceM / dt;
+    rightSpeedMps = rightDistanceM / dt;
+
+    leftError = leftTargetMps - leftSpeedMps;
+    rightError = rightTargetMps - rightSpeedMps;
+
+    integralLeft = integralLeft + leftError * dt;
+    integralRight = integralRight + rightError * dt;
+
+    leftPwm = kp * leftError + ki * integralLeft;
+    rightPwm = kp * rightError + ki * integralRight;
+
+    leftPwm = max(-maxPwm, min(maxPwm, leftPwm));
+    rightPwm = max(-maxPwm, min(maxPwm, rightPwm));
+
+    pwmMsg.data = int16([round(leftPwm), round(rightPwm)]);
+    send(pwmPub, pwmMsg);
+
+    fprintf('dt=%.3f  left=%.3f  right=%.3f  pwm=[%d %d]\n', dt, leftSpeedMps, rightSpeedMps, pwmMsg.data(1), pwmMsg.data(2));
+end</pre>
+
+        <h3>5. Tune the Controller</h3>
+        <ul>
+            <li>Start with <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">ki = 0</code> and increase <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">kp</code> until the wheels respond quickly.</li>
+            <li>Then increase <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">ki</code> gradually to remove steady-state error.</li>
+            <li>If the robot oscillates, reduce <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">kp</code> or <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">ki</code>.</li>
+            <li>Use the MATLAB terminal output to observe measured wheel speed and PWM output in real time.</li>
+        </ul>
+
+        <h3>6. Validate Behavior</h3>
+        <p>To test your controller, run the robot with the wheels lifted first. Confirm that the robot responds to your MATLAB loop, then place it on the floor and verify that the wheel speed tracks your target.</p>
+        <p>You can use the LED topic to show status if you want a simple visual indicator during tuning.</p>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+            <thead>
+                <tr style="background-color: #004b87; color: white;">
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Expected Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Bridge Bring-up</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">The <code style="font-family: monospace; color: #273540;">astar_bridge</code> node runs successfully on the Pi and publishes encoder data.</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>MATLAB PI Loop</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">Your MATLAB script subscribes to encoder ticks and publishes PWM commands continuously.</td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Controller Tuning</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">The measured wheel speed approaches the target speed with stable behavior and no severe oscillation.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">How to Submit</span></h2>
+        <p>Record a short demo video showing the Pi bridge running, your MATLAB controller loop running, and the robot responding to your tuned PI gains.</p>
+        <p>Upload the video to YouTube and include the link in your submission. Save your MATLAB script as <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab2_matlab.txt</code> or the file format your instructor requests.</p>
+        <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> Do not modify the bridge node on the Pi. This lab is specifically about implementing and tuning the PI controller in MATLAB against the bridge-provided topics.</blockquote>
+    </div>
+</div>

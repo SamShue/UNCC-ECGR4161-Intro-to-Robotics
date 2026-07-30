@@ -1,0 +1,219 @@
+<div id="dp-wrapper" class="dp-wrapper">
+    <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0px auto; padding-top: 20px; padding-right: 20px; padding-bottom: 20px;">
+        <h2><span style="color: #004b87;">Lab 3: MATLAB Odometry</span></h2>
+        <p>In this lab, you will implement odometry in MATLAB using ROS Toolbox. The Raspberry Pi will run only the <strong>astar_bridge</strong> node, which publishes encoder ticks. Your MATLAB script will subscribe to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/encoder_ticks</code>, estimate robot pose, and publish the resulting odometry to RViz.</p>
+        <p>This lab keeps the control and estimation workflow inside MATLAB instead of modifying the <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi_base</code> Python node.</p>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Required Materials</span></h2>
+        <ul>
+            <li>Romi32U4 robot with Raspberry Pi 4B</li>
+            <li>Raspberry Pi image prepared from Lab 1</li>
+            <li>MATLAB with ROS Toolbox</li>
+            <li>WSL2 with ROS 2 Humble installed</li>
+            <li>Windows laptop</li>
+            <li>6x AA batteries</li>
+        </ul>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Background</span></h2>
+        <h3>What is Odometry?</h3>
+        <p>Odometry estimates a robot&rsquo;s position (<em>x, y</em>) and heading (<em>&theta;</em>) from motion sensors. For the Romi, the wheel encoders tell us how far each wheel traveled, and we use differential-drive kinematics to integrate that motion into a pose estimate.</p>
+
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0; font-style: italic; color: #555555;"><strong>Note:</strong> Odometry drifts over time. Wheel slip, uneven floors, and small calibration errors will accumulate, so the goal is a reasonable estimated path, not perfect truth.</p>
+        </div>
+
+        <h3>Forward Kinematics</h3>
+        <p>To update pose from encoder motion, convert wheel travel into center displacement and heading change:</p>
+        <div style="background-color: #f1f3f5; padding: 15px 15px 15px 30px; border-radius: 6px; font-family: 'Courier New', Courier, monospace; font-size: 1.1em; margin: 20px 0px; border: 1px solid #e9ecef;">&Delta;s = (d<sub>L</sub> + d<sub>R</sub>) / 2<br />&Delta;&theta; = (d<sub>R</sub> - d<sub>L</sub>) / L<br /><br />x<sub>new</sub> = x<sub>old</sub> + &Delta;s &middot; cos(&theta;<sub>old</sub>)<br />y<sub>new</sub> = y<sub>old</sub> + &Delta;s &middot; sin(&theta;<sub>old</sub>)<br />&theta;<sub>new</sub> = &theta;<sub>old</sub> + &Delta;&theta;</div>
+
+        <h3>Bridge-Only Workflow</h3>
+        <ul>
+            <li>The Pi runs <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">astar_bridge</code>.</li>
+            <li>Your MATLAB script publishes <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/odom</code> using the encoder stream.</li>
+            <li>For visualization, RViz subscribes to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/odom</code> and shows the estimated path in the <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">odom</code> frame.</li>
+        </ul>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Procedure</span></h2>
+
+        <h3>1. Prepare the Robot and Pi</h3>
+        <ol>
+            <li>Use the Lab 1 golden image workflow to set up the Raspberry Pi.</li>
+            <li>Mount the Pi on the Romi, insert batteries, and connect to the robot Wi-Fi network.</li>
+            <li>SSH into the Pi and start the bridge node:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">ssh student@192.168.4.1
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+export ROS_DOMAIN_ID=0
+ros2 run romi_base astar_bridge</pre>
+
+        <h3>2. Open MATLAB and Create Your Odometry Script</h3>
+        <p>Launch MATLAB, sign in with your <strong>charlotte.edu</strong> credentials, and verify that <strong>ROS Toolbox</strong> is installed. Then create a script named <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">romi_lab3_odometry.m</code>.</p>
+
+        <h3>3. Odometry Starter Script</h3>
+        <p>Use the script below as your starting point. It subscribes to encoder ticks, computes pose updates, and publishes a ROS 2 odometry message.</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">% romi_lab3_odometry.m
+% MATLAB odometry for ROMI Lab 3
+
+clear;
+clc;
+
+setenv('ROS_DOMAIN_ID', '0');
+
+node = ros2node('/romi_lab3_odometry');
+encSub = ros2subscriber(node, '/encoder_ticks', 'std_msgs/Int32MultiArray');
+odomPub = ros2publisher(node, '/odom', 'nav_msgs/Odometry');
+
+odomMsg = ros2message(odomPub);
+
+% Robot parameters
+wheelBaseM = 0.141;
+wheelDiameterM = 0.07;
+ticksPerRev = 1440.0;
+wheelCircumferenceM = pi * wheelDiameterM;
+
+% Pose state
+x = 0.0;
+y = 0.0;
+theta = 0.0;
+
+% Encoder history
+prevTicks = [];
+prevTime = tic;
+
+fprintf('Starting ROMI odometry loop...\n');
+
+while true
+    if encSub.NumMessagesAvailable == 0
+        pause(0.01);
+        continue;
+    end
+
+    encMsg = receive(encSub, 1.0);
+    currentTicks = double(encMsg.data(:));
+
+    if numel(currentTicks) < 2
+        warning('Expected encoder data in [left, right] format.');
+        continue;
+    end
+
+    dt = toc(prevTime);
+    prevTime = tic;
+    if dt <= 0
+        dt = 1e-3;
+    end
+
+    if isempty(prevTicks)
+        prevTicks = currentTicks;
+        continue;
+    end
+
+    deltaTicks = currentTicks - prevTicks;
+    prevTicks = currentTicks;
+
+    leftDistanceM = (deltaTicks(1) / ticksPerRev) * wheelCircumferenceM;
+    rightDistanceM = (deltaTicks(2) / ticksPerRev) * wheelCircumferenceM;
+
+    deltaS = (leftDistanceM + rightDistanceM) / 2.0;
+    deltaTheta = (rightDistanceM - leftDistanceM) / wheelBaseM;
+
+    thetaMid = theta + deltaTheta / 2.0;
+    x = x + deltaS * cos(thetaMid);
+    y = y + deltaS * sin(thetaMid);
+    theta = theta + deltaTheta;
+
+    if dt <= 0
+        dt = 1e-3;
+    end
+
+    linearVelocity = deltaS / dt;
+    angularVelocity = deltaTheta / dt;
+
+    qz = sin(theta / 2.0);
+    qw = cos(theta / 2.0);
+
+    odomMsg.header.stamp = ros2time(node);
+    odomMsg.header.frame_id = 'odom';
+    odomMsg.child_frame_id = 'base_link';
+    odomMsg.pose.pose.position.x = x;
+    odomMsg.pose.pose.position.y = y;
+    odomMsg.pose.pose.position.z = 0.0;
+    odomMsg.pose.pose.orientation.x = 0.0;
+    odomMsg.pose.pose.orientation.y = 0.0;
+    odomMsg.pose.pose.orientation.z = qz;
+    odomMsg.pose.pose.orientation.w = qw;
+    odomMsg.twist.twist.linear.x = linearVelocity;
+    odomMsg.twist.twist.angular.z = angularVelocity;
+
+    send(odomPub, odomMsg);
+
+    fprintf('x=%.3f  y=%.3f  theta=%.3f  v=%.3f  w=%.3f\n', x, y, theta, linearVelocity, angularVelocity);
+end</pre>
+
+        <h3>4. Run the Motion Test</h3>
+        <p>Use the Lab 2 MATLAB motion or controller workflow to drive the robot in a square while this odometry script runs. The key requirement is that the robot motion produces encoder data that your MATLAB odometry loop can integrate into a square-shaped path.</p>
+        <p>If you need a simple status indicator, you may publish LED values from MATLAB while the test runs.</p>
+
+        <h3>5. Launch RViz</h3>
+        <p>Open a local WSL terminal and launch RViz:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">rviz2</pre>
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0;"><strong>Side Note &mdash; RViz won&rsquo;t render?</strong> In WSL, RViz sometimes opens as a black or blank window, fails to draw, or crashes on startup because of OpenGL/GPU limitations. If that happens, force RViz to use software rendering:</p>
+            <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">export LIBGL_ALWAYS_SOFTWARE=1
+rviz2</pre>
+        </div>
+        <p>Configure RViz as follows:</p>
+        <ul>
+            <li>Set the <strong>Fixed Frame</strong> to <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">odom</code>.</li>
+            <li>Add the <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">/odom</code> display.</li>
+            <li>Add a <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">TF</code> display if your MATLAB setup is also broadcasting transforms.</li>
+        </ul>
+
+        <h3>6. Verify the Square Path</h3>
+        <p>Run the same square-motion test used in Lab 2 while the odometry loop is active. RViz should show an estimated path that resembles a square, and the robot should return close to its starting position after the fourth side.</p>
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;"><strong>Important:</strong> Do not tune the robot motion to hide odometry problems. If the physical path is poor, tune the Lab 2 controller. If the RViz path looks wrong, debug your MATLAB odometry equations and frame handling.</p>
+        </div>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">Verification Tasks</span></h2>
+        <p>Your video must show both the physical robot and the RViz visualization.</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; text-align: left;">
+            <thead>
+                <tr style="background-color: #004b87; color: white;">
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Verification Test</th>
+                    <th style="padding: 12px; border: 1px solid #dddddd;">Expected Observation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Odometry Publishing</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">MATLAB publishes <code style="font-family: monospace; color: #273540;">/odom</code> while the bridge publishes encoder ticks.</td>
+                </tr>
+                <tr style="background-color: #f9f9f9;">
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Square Path Visualization</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">RViz shows a square-like estimated path while the robot runs the square motion test.</td>
+                </tr>
+                <tr>
+                    <td style="padding: 12px; border: 1px solid #dddddd;"><strong>Physical and Estimated Motion Comparison</strong></td>
+                    <td style="padding: 12px; border: 1px solid #dddddd;">The estimated path should correspond to the robot&rsquo;s physical motion, with some drift allowed.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr style="border-width: 1px 0px 0px; border-style: solid none none; border-color: #cccccc currentcolor currentcolor; margin: 30px 0px;" />
+
+        <h2><span style="color: #004b87;">How to Submit</span></h2>
+        <p>Record a short video that shows the Pi bridge running, your MATLAB odometry script running, the robot moving in a square, and RViz tracking that motion.</p>
+        <p>Upload the video to <strong>YouTube only</strong> and include the link in your submission. Save your MATLAB script as <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">lastname_firstname_lab3_matlab.txt</code> or the file format required by your instructor.</p>
+        <p><img id="33208743" style="margin-top: 10px; border-radius: 4px;" src="https://instructure.charlotte.edu/courses/270262/files/33208743/preview" alt="exampleHeader.jpg" width="736" height="356" data-api-endpoint="https://instructure.charlotte.edu/api/v1/courses/270262/files/33208743" data-api-returntype="File" /></p>
+        <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> Do not modify the bridge node on the Pi. This lab is about estimating pose in MATLAB from the bridge-provided encoder stream.</blockquote>
+    </div>
+</div>

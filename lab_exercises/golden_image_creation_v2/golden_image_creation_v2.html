@@ -1,0 +1,351 @@
+<div id="dp-wrapper" class="dp-wrapper">
+    <div class="canvas-assignment" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333333; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 20px;">
+        <h2><span style="color: #004b87;">Golden Image Creation v2.0</span></h2>
+        <p>This document outlines the process for creating a golden image to flash to a Raspberry Pi 4B for use in a distributed robotics platform for ECGR 4161: Intro to Robotics.</p>
+        <p>A golden image is a master operating system template pre-configured with required software, dependencies, and settings. Rather than manually setting up Ubuntu, ROS 2, and networking on each robot, you configure one reference Pi, capture its exact state, and flash that image to many SD cards.</p>
+
+        <div style="background-color: #f8f9fa; border-left: 4px solid #004B87; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0;"><strong>Pipeline Overview:</strong></p>
+            <ol style="margin-top: 10px; margin-bottom: 0;">
+                <li><strong>The Foundation (Phases 1 and 2):</strong> Start from a fresh Ubuntu Server install, define network behavior, and install robotics toolchains.</li>
+                <li><strong>The Scrub (Phase 3):</strong> Remove machine-specific identity data so each cloned Pi generates unique IDs and keys on first boot.</li>
+                <li><strong>Capture and Compression (Phases 4 and 5):</strong> Clone the cleaned SD card image and shrink it using PiShrink for easy distribution.</li>
+            </ol>
+        </div>
+
+        <hr style="border-width: 1px 0 0; border-style: solid; border-color: #cccccc; margin: 30px 0;" />
+
+        <h2><span style="color: #004b87;">Required Materials</span></h2>
+        <ul>
+            <li>32GB SD card</li>
+            <li>Raspberry Pi 4B (with appropriate power supply)</li>
+            <li>Wired internet connection (Ethernet)</li>
+            <li>Windows laptop (with SD reader/adapter)</li>
+        </ul>
+
+        <hr style="border-width: 1px 0 0; border-style: solid; border-color: #cccccc; margin: 30px 0;" />
+
+        <h2><span style="color: #004b87;">Phase 1: Clean Installation</span></h2>
+
+        <h3>Ubuntu Flash</h3>
+        <ol>
+            <li>Install Raspberry Pi Imager.</li>
+            <li>Mount SD card in Windows.</li>
+            <li>Open Raspberry Pi Imager.</li>
+            <li>Flash the SD card.</li>
+        </ol>
+
+        <h3>Pre-Boot Configuration</h3>
+        <ol>
+            <li>Pi Imager usually ejects the drive automatically after flashing. Remount the drive.</li>
+            <li>Open the drive in Windows File Explorer.</li>
+            <li>Find the file named <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">network-config</code> and set it to:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: true
+      dhcp6: true
+      optional: true
+    wlan0:
+      dhcp4: false
+      addresses: [192.168.4.1/24]</pre>
+        <ol start="4">
+            <li>Save the file.</li>
+            <li>Find the file named <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">user-data</code>.</li>
+            <li>You may now eject the drive.</li>
+        </ol>
+
+        <hr style="border-width: 1px 0 0; border-style: solid; border-color: #cccccc; margin: 30px 0;" />
+
+        <h2><span style="color: #004b87;">Phase 2: Pi Ubuntu Setup</span></h2>
+
+        <h3>First Boot</h3>
+        <ol>
+            <li>Insert your SD card into the Pi.</li>
+            <li>Insert your internet-connected Ethernet cable into the Pi.</li>
+            <li>Supply power to the Pi.</li>
+            <li>Wait a few minutes for boot completion.</li>
+            <li>SSH into the Pi using <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">ssh &lt;user&gt;@&lt;hostname&gt;.local</code>.</li>
+        </ol>
+
+        <h3>ROS 2 Installation</h3>
+        <p>Follow the <a style="color: #004b87;" href="https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html" target="_blank" rel="noopener">ROS 2 Humble Installation Guide for Ubuntu</a> (recommended), or use the commands below.</p>
+
+        <ol>
+            <li>Update system packages:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt update &amp;&amp; sudo apt upgrade -y</pre>
+
+        <ol start="2">
+            <li>Verify locale supports UTF-8 using <code style="background-color: #f4f4f4; padding: 2px 6px; border-radius: 4px; color: #273540; font-family: monospace;">locale</code>.</li>
+            <li>Ensure the Ubuntu Universe repository is enabled.</li>
+            <li>Install ROS apt source package:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt update &amp;&amp; sudo apt install curl -y
+
+export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
+
+curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release &amp;&amp; echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb"
+
+sudo dpkg -i /tmp/ros2-apt-source.deb</pre>
+
+        <ol start="5">
+            <li>Update and upgrade again:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt update &amp;&amp; sudo apt upgrade -y</pre>
+
+        <ol start="6">
+            <li>Install base ROS 2:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt install ros-humble-ros-base</pre>
+
+        <ol start="7">
+            <li>Install ROS 2 dev tools:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt install ros-dev-tools</pre>
+
+        <ol start="8">
+            <li>Install example nodes:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt install ros-humble-demo-nodes-cpp ros-humble-demo-nodes-py</pre>
+
+        <ol start="9">
+            <li>Source ROS 2 automatically for new terminals (run once):</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">echo "source /opt/ros/humble/setup.bash" &gt;&gt; ~/.bashrc</pre>
+
+        <h3>Romi Interface Setup</h3>
+
+        <h4>I2C Setup</h4>
+        <ol>
+            <li>The OS should boot with I2C enabled, but verify manually.</li>
+            <li>Open config:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo nano /boot/firmware/config.txt</pre>
+        <ol start="3">
+            <li>Verify I2C settings are present/enabled.</li>
+        </ol>
+
+        <h4>Pololu I2C Slave Software</h4>
+        <ol>
+            <li>Install required Python dependencies:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt-get install python3 python3-flask python3-smbus</pre>
+        <ol start="2">
+            <li>Download Pololu library:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">wget https://github.com/pololu/pololu-rpi-slave-arduino-library/archive/&lt;version&gt;.tar.gz
+
+tar -xzf &lt;version&gt;.tar.gz
+
+mv pololu-rpi-slave-arduino-library-&lt;version&gt; pololu-rpi-slave-arduino-library</pre>
+
+        <h3>Wireless AP Configuration</h3>
+        <p>The packages installed at boot (net-tools, iw, hostapd, and dnsmasq) are used in this section.</p>
+
+        <ol>
+            <li>Stop and disable AP services:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo systemctl stop hostapd dnsmasq
+sudo systemctl disable hostapd dnsmasq</pre>
+
+        <ol start="2">
+            <li>Edit dnsmasq config:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo nano /etc/dnsmasq.conf</pre>
+        <ol start="3">
+            <li>Write:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">interface=wlan0
+bind-interfaces
+dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h</pre>
+
+        <ol start="4">
+            <li>Edit hostapd config:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo nano /etc/hostapd/hostapd.conf</pre>
+        <ol start="5">
+            <li>Paste:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">interface=wlan0
+driver=nl80211
+ssid=MyRomiNetwork
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=romi
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+country_code=US</pre>
+
+        <ol start="6">
+            <li>Set hostapd default config:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo nano /etc/default/hostapd</pre>
+        <p>Ensure this line exists and is uncommented:</p>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">DAEMON_CONF="/etc/hostapd/hostapd.conf"</pre>
+
+        <ol start="7">
+            <li>Edit netplan config:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo nano /etc/netplan/50-cloud-init.yaml</pre>
+        <ol start="8">
+            <li>Paste:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: true
+      dhcp6: true
+      optional: true
+    wlan0:
+      dhcp4: false
+      addresses: [192.168.4.1/24]</pre>
+
+        <ol start="9">
+            <li>Edit systemd-resolved config:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo nano /etc/systemd/resolved.conf</pre>
+        <ol start="10">
+            <li>Set:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">DNSStubListener=no</pre>
+
+        <ol start="11">
+            <li>Create startup script for dynamic SSID/channel:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">#!/bin/bash
+
+# MAKE SURE TO RUN THE FOLLOWING AFTER SAVING THIS FILE
+# sudo chmod +x /usr/local/bin/update_wifi.sh
+
+# 1. Get the MAC and create the unique SSID
+FULL_MAC=$(cat /sys/class/net/wlan0/address | tr -d ':')
+SHORT_ID=${FULL_MAC: -4}
+NEW_SSID="Romi-$SHORT_ID"
+
+# 2. Pick a random clean channel (1, 6, or 11)
+NEW_CHANNEL=$(printf "1\n6\n11" | shuf -n 1)
+
+# 3. Apply changes to hostapd.conf
+sed -i "s/^ssid=.*/ssid=$NEW_SSID/" /etc/hostapd/hostapd.conf
+sed -i "s/^channel=.*/channel=$NEW_CHANNEL/" /etc/hostapd/hostapd.conf
+
+# 4. Log the result
+echo "[$(date)] WiFi Init: SSID=$NEW_SSID Channel=$NEW_CHANNEL" &gt;&gt; /var/log/robot_wifi.log</pre>
+
+        <ol start="12">
+            <li>Configure startup cron job:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo crontab -e</pre>
+        <ol start="13">
+            <li>Add:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">@reboot sleep 5; netplan apply &amp;&amp; /bin/bash /usr/local/bin/update_wifi.sh &amp;&amp; systemctl restart hostapd dnsmasq</pre>
+
+        <ol start="14">
+            <li>Unmask hostapd:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo systemctl unmask hostapd</pre>
+
+        <hr style="border-width: 1px 0 0; border-style: solid; border-color: #cccccc; margin: 30px 0;" />
+
+        <h2><span style="color: #004b87;">Phase 3: Sanitize the Build for Cloning</span></h2>
+
+        <h3>Clear Package and Workspace Artifacts</h3>
+        <ol>
+            <li>Clean apt cache and unnecessary dependencies:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt-get autoremove --purge -y; sudo apt-get clean</pre>
+        <ol start="2">
+            <li>Clear temporary files:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo rm -rf /tmp/* /var/tmp/*</pre>
+
+        <h3>System Identity and Log Wipe</h3>
+        <ol>
+            <li>Truncate logs:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo find /var/log -type f -exec truncate -s 0 {} +</pre>
+
+        <ol start="2">
+            <li>Wipe machine-id and reset dbus link:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo truncate -s 0 /etc/machine-id
+sudo rm /var/lib/dbus/machine-id
+sudo ln -s /etc/machine-id /var/lib/dbus/machine-id</pre>
+
+        <ol start="3">
+            <li>Remove unique SSH host keys:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo rm -f /etc/ssh/ssh_host_*</pre>
+
+        <h3>Cloud-Init and Network Reset</h3>
+        <ol>
+            <li>Disable cloud-init network overwrite:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">echo "network: {config: disabled}" | sudo tee /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg</pre>
+
+        <ol start="2">
+            <li>Clean cloud-init logs and seed state:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo cloud-init clean --logs --seed</pre>
+
+        <ol start="3">
+            <li>Remove instance-specific cloud-init data:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo rm -rf /var/lib/cloud/instances/*</pre>
+
+        <ol start="4">
+            <li>Final shutdown prep:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">cat /dev/null &gt; ~/.bash_history &amp;&amp; history -c &amp;&amp; sudo shutdown -h now</pre>
+
+        <hr style="border-width: 1px 0 0; border-style: solid; border-color: #cccccc; margin: 30px 0;" />
+
+        <h2><span style="color: #004b87;">Phase 4: Cloning Disk Image</span></h2>
+        <ol>
+            <li>Remove SD card from the Pi.</li>
+            <li>Mount SD card in Windows.</li>
+            <li>Install Win32 Disk Imager.</li>
+            <li>Use Win32 Disk Imager to clone the SD card to an image file and note where you save it.</li>
+        </ol>
+
+        <hr style="border-width: 1px 0 0; border-style: solid; border-color: #cccccc; margin: 30px 0;" />
+
+        <h2><span style="color: #004b87;">Phase 5: Final Packaging (Shrink Image)</span></h2>
+
+        <ol>
+            <li>Install PiShrink in WSL:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo apt update &amp;&amp; sudo apt install -y wget parted gzip pigz xz-utils udev e2fsprogs
+
+wget https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh
+
+chmod +x pishrink.sh
+
+sudo mv pishrink.sh /usr/local/bin</pre>
+
+        <ol start="2">
+            <li>Move clone image into WSL home directory:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo mv &lt;path to your clone&gt; ~</pre>
+
+        <ol start="3">
+            <li>Shrink filesystem image:</li>
+        </ol>
+        <pre style="background-color: #1e1e1e; color: #ffffff; padding: 12px; border-radius: 4px; font-family: monospace; overflow-x: auto; margin: 10px 0;">sudo pishrink.sh -a &lt;clone file&gt;</pre>
+
+        <p>The resulting image should shrink to under 10GB and is ready for distribution.</p>
+
+        <blockquote style="background-color: #fcf8e3; border-left: 4px solid #f0ad4e; padding: 15px; margin: 20px 0; border-radius: 4px; color: #8a6d3b;"><strong>Important:</strong> Perform sanitization steps exactly before cloning. Skipping identity cleanup can cause duplicate host keys, network conflicts, and difficult-to-debug multi-robot failures.</blockquote>
+    </div>
+</div>
